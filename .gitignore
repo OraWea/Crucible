@@ -9,3 +9,11 @@ data/crucible.db
 # 忽略 Python 缓存
 __pycache__/
 *.pyc
+
+# 忽略数据及备份文件
+data/backups/
+data/vault/
+
+# 忽略临时运行文件
+temp/
+scratch/
