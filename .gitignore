@@ -1,0 +1,11 @@
+# 忽略所有日志文件
+*.log
+app.log
+
+# 忽略本地 SQLite 数据库
+*.db
+data/crucible.db
+
+# 忽略 Python 缓存
+__pycache__/
+*.pyc
