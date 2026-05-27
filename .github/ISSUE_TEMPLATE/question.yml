@@ -1,0 +1,59 @@
+name: ❓ 技术咨询与答疑 (Question)
+description: 针对 Crucible 的架构设计、AI 提示词微调、或本地部署进行提问
+title: "[Q]: <简短描述你的疑问>"
+labels: ["question"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        在提交问题之前，请确保你已经查看过项目的 README 以及现有的 Issues。
+        清晰的问题描述能让我们更快地为你提供解答！
+
+  - type: textarea
+    id: core_question
+    attributes:
+      label: 💡 你的问题是什么？
+      description: 请用一两句话清晰地描述你感到困惑的地方、或者你想实现但不知道如何下手的操作。
+      placeholder: 例如：如何在不重新加载 Qwen-VL 模型的情况下，在 GUI 中切换不同的本地知识库文件夹？
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 🔍 背景与上下文
+      description: 这个问题是在什么场景下产生的？你目前的代码架构或配置是怎样的？
+      placeholder: 我正在尝试修改 `models/llm_core.py` 里的反思 Prompt，希望让它针对 C++ 课程视频输出更密集的代码块，但是发现...
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempted_solutions
+    attributes:
+      label: 🛠️ 你已经尝试过哪些解决方法？
+      description: 为了解决这个问题，你做过哪些尝试？（比如查过哪些文档，改过哪行代码，结果如何？）
+      placeholder: 我尝试调高了 Qwen 的 temperature 参数，但导致输出了不符合 Markdown 语法的乱码...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 🏷️ 问题分类
+      description: 这个问题更偏向于哪个技术模块？
+      options:
+        - "AI 模型与提示词 (Whisper/Qwen/VLM)"
+        - "PyQt6 前端与多线程线程调度 (GUI/QThread)"
+        - "文件系统与本地 Markdown 编织 (I/O/Git)"
+        - "其他 / 宏观架构咨询"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: search_check
+    attributes:
+      label: 确认
+      options:
+        - label: 我已经独立思考并查阅过相关基础文档，确认这不是一个通过搜索引擎能直接搜到标准答案的问题。
+          required: true
