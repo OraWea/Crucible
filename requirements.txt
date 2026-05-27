@@ -10,3 +10,4 @@ markdown-it-py
 python-dotenv
 requests
 Pillow
+dashscope

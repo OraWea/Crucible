@@ -146,7 +146,10 @@ class AudioProcessor:
             raise ImportError("未发现 'yt_dlp' 第三方库，请先安装该依赖项再进行网络下载。")
         except Exception as e:
             logger.error(f"在线 URL 下载失败: {e}", exc_info=True)
-            raise RuntimeError(f"在线媒体下载失败: {e}")
+            err_msg = str(e)
+            if any(k in err_msg.lower() for k in ["proxy", "127.0.0.1", "refused", "积极拒绝", "connectionerror"]):
+                err_msg += "\n\n【提示】检测到代理/网络连接异常。请确认代理软件（如 Clash、V2ray 等）是否已开启并正常运行。如果已关闭代理软件，请检查系统环境变量中的 HTTP_PROXY/HTTPS_PROXY 或系统代理设置，以清除残留的代理配置。"
+            raise RuntimeError(f"在线媒体下载失败: {err_msg}")
 
     def get_audio_duration(self, audio_path: str) -> float:
         """获取音频文件的总时长（秒）"""
@@ -156,6 +159,27 @@ class AudioProcessor:
         except Exception as e:
             logger.error(f"获取音频时长失败: {audio_path}, {e}")
             return 0.0
+
+    def get_video_title(self, url: str) -> str:
+        """使用 yt-dlp 获取在线视频的标题（不下载视频）"""
+        try:
+            import yt_dlp
+            import re
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'skip_download': True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get('title')
+                if title:
+                    # 移除非法文件名字符，方便后续可能的文件命名
+                    return re.sub(r'[\\/*?:"<>|]', '_', title).strip()
+        except Exception as e:
+            logger.warning(f"获取视频标题失败: {url}, 错误: {e}")
+        # 回退处理：截取 URL 尾部或返回安全字符串
+        return url.split('/')[-1] or "Online_Video"
 
 # 单例模式
 audio_processor = AudioProcessor()

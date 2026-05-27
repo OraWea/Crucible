@@ -43,3 +43,824 @@ Traceback (most recent call last):
   File "C:\Users\qingz\Desktop\Crucible\gui.py", line 284, in run
     duration = audio_processor.get_audio_duration(wav_path)
 AttributeError: 'AudioProcessor' object has no attribute 'get_audio_duration'
+2026-05-27 13:56:51,940 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:56:51,941 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 0 个概念路径。
+2026-05-27 13:57:15,339 - Crucible.utils.audio_processor - INFO - 提取音频中: C:/Users/qingz/Downloads/35895576580-1-192.mp4
+2026-05-27 13:57:15,571 - Crucible.utils.audio_processor - INFO - 音频成功分离提取至: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:57:15,572 - Crucible.models.whisper_model - INFO - 正在加载 Whisper ASR 模型: base (设备: cpu)
+2026-05-27 13:57:16,560 - Crucible.models.whisper_model - INFO - Whisper base 模型加载成功。
+2026-05-27 13:57:16,575 - Crucible.models.whisper_model - INFO - 开始 Whisper 转写: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:58:09,798 - Crucible.models.whisper_model - INFO - Whisper 转写完成，共生成 1 个片段，用时 53.22s
+2026-05-27 13:58:09,818 - Crucible.models.vlm_analyzer - INFO - 开始分析视频关键帧 (共 3 个时间点)...
+2026-05-27 13:58:10,337 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/35895576580-1-192.mp4 在 4.82s (索引 144)
+2026-05-27 13:58:40,734 - Crucible.models.vlm_analyzer - ERROR - 分析时间点 4.82s 处的帧失败: HTTPSConnectionPool(host='dashscope.aliyuncs.com', port=443): Read timed out. (read timeout=30)
+2026-05-27 13:58:40,880 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/35895576580-1-192.mp4 在 24.10s (索引 723)
+2026-05-27 13:58:44,922 - Crucible.models.vlm_analyzer - INFO - 时间轴 24.1s 分析完成:
+OCR: 接下来进阶
+让我们试试后撤步+qe上箱...
+描述: 这张图片展示了一个第一人称射击游戏的场景。玩家视角中，手中握着一把红黑相间的枪械，枪械上有明显的数字标识“15”。画面背景是一个具有东方建筑风格的区域，周围有传统的瓦房和树木。远处可以看到一座塔楼，环...
+2026-05-27 13:58:45,088 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/35895576580-1-192.mp4 在 43.38s (索引 1301)
+2026-05-27 13:58:49,094 - Crucible.models.vlm_analyzer - INFO - 时间轴 43.38s 分析完成:
+OCR: 无...
+描述: 这张图片展示了一个游戏场景，视角为第一人称。画面中可以看到一个角色手持一把红黑相间的枪械，位于一条狭窄的街道上。街道两侧是建筑物，左侧建筑为浅色墙面，右侧建筑墙面上有花卉壁画和“VINI VENARI...
+2026-05-27 13:58:49,108 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 13:59:08,933 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 5 个核心概念，用时 19.81s
+2026-05-27 13:59:08,946 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 后撤步
+2026-05-27 13:59:08,951 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:59:08,951 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 0 个概念路径。
+2026-05-27 13:59:08,952 - Crucible.models.llm_core - INFO - 概念 '后撤步' 在知识库中是新笔记。
+2026-05-27 13:59:23,553 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\后撤步.md
+2026-05-27 13:59:23,565 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:59:23,581 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 1 个概念路径。
+2026-05-27 13:59:23,581 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 13:59:30,117 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 6.53s
+2026-05-27 13:59:30,133 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\后撤步_backup_20260527_135930.md
+2026-05-27 13:59:30,138 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\后撤步.md
+2026-05-27 13:59:30,138 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: QE上箱
+2026-05-27 13:59:30,139 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:59:30,151 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 1 个概念路径。
+2026-05-27 13:59:30,152 - Crucible.models.llm_core - INFO - 概念 'QE上箱' 在知识库中是新笔记。
+2026-05-27 13:59:42,225 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\QE上箱.md
+2026-05-27 13:59:42,237 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:59:42,252 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 2 个概念路径。
+2026-05-27 13:59:42,252 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 13:59:46,167 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 3.91s
+2026-05-27 13:59:46,187 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\QE上箱_backup_20260527_135946.md
+2026-05-27 13:59:46,192 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\QE上箱.md
+2026-05-27 13:59:46,192 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 小跳加+转视角dash
+2026-05-27 13:59:46,192 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:59:46,206 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 2 个概念路径。
+2026-05-27 13:59:46,206 - Crucible.models.llm_core - INFO - 概念 '小跳加+转视角dash' 在知识库中是新笔记。
+2026-05-27 14:00:03,101 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\小跳加+转视角dash.md
+2026-05-27 14:00:03,114 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:03,127 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 3 个概念路径。
+2026-05-27 14:00:03,127 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 14:00:09,803 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 20，是否合格: False。用时: 6.67s
+2026-05-27 14:00:09,829 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\小跳加+转视角dash_backup_20260527_140009.md
+2026-05-27 14:00:09,833 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\小跳加+转视角dash.md
+2026-05-27 14:00:09,834 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 防直架
+2026-05-27 14:00:09,834 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:09,852 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 3 个概念路径。
+2026-05-27 14:00:09,852 - Crucible.models.llm_core - INFO - 概念 '防直架' 在知识库中是新笔记。
+2026-05-27 14:00:21,736 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\防直架.md
+2026-05-27 14:00:21,749 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:21,762 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 4 个概念路径。
+2026-05-27 14:00:21,763 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 14:00:26,932 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 5.17s
+2026-05-27 14:00:26,952 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\防直架_backup_20260527_140026.md
+2026-05-27 14:00:26,957 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\防直架.md
+2026-05-27 14:00:26,957 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 丝滑进点
+2026-05-27 14:00:26,957 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:26,969 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 4 个概念路径。
+2026-05-27 14:00:26,970 - Crucible.models.llm_core - INFO - 概念 '丝滑进点' 在知识库中是新笔记。
+2026-05-27 14:00:38,091 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\丝滑进点.md
+2026-05-27 14:00:38,104 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:38,118 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 14:00:38,118 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 14:00:42,562 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 30，是否合格: False。用时: 4.44s
+2026-05-27 14:00:42,579 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\丝滑进点_backup_20260527_140042.md
+2026-05-27 14:00:42,583 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\丝滑进点.md
+2026-05-27 14:00:44,388 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:00:44,401 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 14:50:32,344 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 14:50:32,348 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 14:53:41,088 - Crucible.utils.audio_processor - WARNING - 获取视频标题失败: https://www.bilibili.com/video/BV1ssFxzwEJi/?vd_source=8bc084f764a43f8ae8245faeab0f29d4, 错误: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:53:41,089 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1ssFxzwEJi/?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 14:53:41,092 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 14:53:43,201 - Crucible.utils.audio_processor - ERROR - 在线 URL 下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\retry.py", line 465, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 320, in _send
+    requests_res = session.request(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 683, in send
+    raise ProxyError(e)
+requests.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 909, in _request_webpage
+    return self._downloader.urlopen(self._create_request(url_or_request, data, headers, query, extensions))
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 4190, in urlopen
+    return self._request_director.send(req)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 117, in send
+    response = handler.send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_helper.py", line 194, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 359, in send
+    return self._send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 341, in _send
+    raise ProxyError(cause=e) from e
+yt_dlp.networking.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1645, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1780, in __extract_info
+    ie_result = ie.extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 762, in extract
+    ie_result = self._real_extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\bilibili.py", line 661, in _real_extract
+    webpage, urlh = self._download_webpage_handle(url, video_id, headers=headers)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 973, in _download_webpage_handle
+    urlh = self._request_webpage(url_or_request, video_id, note, errnote, fatal, data=data,
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 922, in _request_webpage
+    raise ExtractorError(errmsg, cause=err)
+yt_dlp.utils.ExtractorError: [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1634, in extract_info
+    return self.__extract_info(url, self.get_info_extractor(key), download, extra_info, process)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1663, in wrapper
+    self.report_error(str(e), e.format_traceback())
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1103, in report_error
+    self.trouble(f'{self._format_err("ERROR:", self.Styles.ERROR)} {message}', *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1042, in trouble
+    raise DownloadError(message, exc_info)
+yt_dlp.utils.DownloadError: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:53:43,204 - Crucible.utils.audio_processor - ERROR - 媒体预处理阶段失败: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:53:43,204 - Crucible_GUI - ERROR - 后台 AIWorker 执行中断: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\retry.py", line 465, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 320, in _send
+    requests_res = session.request(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 683, in send
+    raise ProxyError(e)
+requests.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 909, in _request_webpage
+    return self._downloader.urlopen(self._create_request(url_or_request, data, headers, query, extensions))
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 4190, in urlopen
+    return self._request_director.send(req)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 117, in send
+    response = handler.send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_helper.py", line 194, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 359, in send
+    return self._send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 341, in _send
+    raise ProxyError(cause=e) from e
+yt_dlp.networking.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1645, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1780, in __extract_info
+    ie_result = ie.extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 762, in extract
+    ie_result = self._real_extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\bilibili.py", line 661, in _real_extract
+    webpage, urlh = self._download_webpage_handle(url, video_id, headers=headers)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 973, in _download_webpage_handle
+    urlh = self._request_webpage(url_or_request, video_id, note, errnote, fatal, data=data,
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 922, in _request_webpage
+    raise ExtractorError(errmsg, cause=err)
+yt_dlp.utils.ExtractorError: [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1634, in extract_info
+    return self.__extract_info(url, self.get_info_extractor(key), download, extra_info, process)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1663, in wrapper
+    self.report_error(str(e), e.format_traceback())
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1103, in report_error
+    self.trouble(f'{self._format_err("ERROR:", self.Styles.ERROR)} {message}', *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1042, in trouble
+    raise DownloadError(message, exc_info)
+yt_dlp.utils.DownloadError: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\gui.py", line 303, in run
+    wav_path = audio_processor.process_media(file_path, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 117, in process_media
+    raise e
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 98, in process_media
+    downloaded_file = self.download_online_media(media_path_or_url, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 149, in download_online_media
+    raise RuntimeError(f"在线媒体下载失败: {e}")
+RuntimeError: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:57:11,221 - Crucible.utils.audio_processor - WARNING - 获取视频标题失败: https://www.bilibili.com/video/BV1ssFxzwEJi/?vd_source=8bc084f764a43f8ae8245faeab0f29d4, 错误: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:57:11,221 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1ssFxzwEJi/?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 14:57:11,221 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 14:57:13,348 - Crucible.utils.audio_processor - ERROR - 在线 URL 下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\retry.py", line 465, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 320, in _send
+    requests_res = session.request(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 683, in send
+    raise ProxyError(e)
+requests.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 909, in _request_webpage
+    return self._downloader.urlopen(self._create_request(url_or_request, data, headers, query, extensions))
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 4190, in urlopen
+    return self._request_director.send(req)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 117, in send
+    response = handler.send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_helper.py", line 194, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 359, in send
+    return self._send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 341, in _send
+    raise ProxyError(cause=e) from e
+yt_dlp.networking.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1645, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1780, in __extract_info
+    ie_result = ie.extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 762, in extract
+    ie_result = self._real_extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\bilibili.py", line 661, in _real_extract
+    webpage, urlh = self._download_webpage_handle(url, video_id, headers=headers)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 973, in _download_webpage_handle
+    urlh = self._request_webpage(url_or_request, video_id, note, errnote, fatal, data=data,
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 922, in _request_webpage
+    raise ExtractorError(errmsg, cause=err)
+yt_dlp.utils.ExtractorError: [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1634, in extract_info
+    return self.__extract_info(url, self.get_info_extractor(key), download, extra_info, process)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1663, in wrapper
+    self.report_error(str(e), e.format_traceback())
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1103, in report_error
+    self.trouble(f'{self._format_err("ERROR:", self.Styles.ERROR)} {message}', *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1042, in trouble
+    raise DownloadError(message, exc_info)
+yt_dlp.utils.DownloadError: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:57:13,351 - Crucible.utils.audio_processor - ERROR - 媒体预处理阶段失败: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 14:57:13,351 - Crucible_GUI - ERROR - 后台 AIWorker 执行中断: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\retry.py", line 465, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 773, in urlopen
+    self._prepare_proxy(conn)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connectionpool.py", line 1042, in _prepare_proxy
+    conn.connect()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 320, in _send
+    requests_res = session.request(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\requests\adapters.py", line 683, in send
+    raise ProxyError(e)
+requests.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 909, in _request_webpage
+    return self._downloader.urlopen(self._create_request(url_or_request, data, headers, query, extensions))
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 4190, in urlopen
+    return self._request_director.send(req)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 117, in send
+    response = handler.send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_helper.py", line 194, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\common.py", line 359, in send
+    return self._send(request)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\networking\_requests.py", line 341, in _send
+    raise ProxyError(cause=e) from e
+yt_dlp.networking.exceptions.ProxyError: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1645, in wrapper
+    return func(self, *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1780, in __extract_info
+    ie_result = ie.extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 762, in extract
+    ie_result = self._real_extract(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\bilibili.py", line 661, in _real_extract
+    webpage, urlh = self._download_webpage_handle(url, video_id, headers=headers)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 973, in _download_webpage_handle
+    urlh = self._request_webpage(url_or_request, video_id, note, errnote, fatal, data=data,
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\common.py", line 922, in _request_webpage
+    raise ExtractorError(errmsg, cause=err)
+yt_dlp.utils.ExtractorError: [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1634, in extract_info
+    return self.__extract_info(url, self.get_info_extractor(key), download, extra_info, process)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1663, in wrapper
+    self.report_error(str(e), e.format_traceback())
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1103, in report_error
+    self.trouble(f'{self._format_err("ERROR:", self.Styles.ERROR)} {message}', *args, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1042, in trouble
+    raise DownloadError(message, exc_info)
+yt_dlp.utils.DownloadError: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\gui.py", line 303, in run
+    wav_path = audio_processor.process_media(file_path, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 117, in process_media
+    raise e
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 98, in process_media
+    downloaded_file = self.download_online_media(media_path_or_url, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 149, in download_online_media
+    err_msg = str(e)
+RuntimeError: 在线媒体下载失败: [0;31mERROR:[0m [BiliBili] 1ssFxzwEJi: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。")) (caused by ProxyError('(\'Unable to connect to proxy\', NewConnectionError("HTTPSConnection(host=\'127.0.0.1\', port=65533): Failed to establish a new connection: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"))')); please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U
+2026-05-27 15:02:17,397 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:02:17,399 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:03:31,608 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1ssFxzwEJi/?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 15:03:31,614 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 15:03:32,685 - Crucible.utils.audio_processor - INFO - 网络媒体下载完成: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:03:32,686 - Crucible.utils.audio_processor - INFO - 转换音频格式中: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:03:35,361 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼 ASR 服务，无需本地加载大模型。
+2026-05-27 15:03:35,377 - Crucible.models.whisper_model - INFO - 开始百炼 ASR 任务提交: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:03:35,388 - Crucible.models.whisper_model - INFO - 正在提交百炼 ASR 任务，使用模型: paraformer-v2
+2026-05-27 15:03:35,960 - Crucible.models.whisper_model - INFO - 百炼 ASR 任务提交成功，任务 ID: 39bc7b1f-2e9b-46b9-b27a-234adc6f4204，等待转写中...
+2026-05-27 15:03:36,491 - Crucible.models.whisper_model - INFO - 百炼 ASR 识别完成，共生成 0 个片段，用时 1.11s
+2026-05-27 15:03:36,504 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:03:37,535 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 0 个核心概念，用时 1.02s
+2026-05-27 15:03:44,397 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:03:44,399 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:04:46,227 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1twLH6LE4R/?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 15:04:46,235 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 15:04:47,919 - Crucible.utils.audio_processor - INFO - 网络媒体下载完成: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:04:47,920 - Crucible.utils.audio_processor - INFO - 转换音频格式中: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:04:48,208 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼 ASR 服务，无需本地加载大模型。
+2026-05-27 15:04:48,222 - Crucible.models.whisper_model - INFO - 开始百炼 ASR 任务提交: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:04:48,234 - Crucible.models.whisper_model - INFO - 正在提交百炼 ASR 任务，使用模型: paraformer-v2
+2026-05-27 15:04:48,843 - Crucible.models.whisper_model - INFO - 百炼 ASR 任务提交成功，任务 ID: f6e8b4fb-b10c-47ca-8aff-ace7f522d6ed，等待转写中...
+2026-05-27 15:04:49,341 - Crucible.models.whisper_model - INFO - 百炼 ASR 识别完成，共生成 0 个片段，用时 1.12s
+2026-05-27 15:04:49,358 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:04:50,352 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 0 个核心概念，用时 0.98s
+2026-05-27 15:04:52,426 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:04:52,428 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:15:06,656 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:15:06,658 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:15:30,260 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1twLH6LE4R/?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 15:15:30,263 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 15:15:31,866 - Crucible.utils.audio_processor - INFO - 网络媒体下载完成: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:15:31,867 - Crucible.utils.audio_processor - INFO - 转换音频格式中: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:15:32,159 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼实时流式 ASR 服务，无需本地加载大模型。
+2026-05-27 15:15:32,173 - Crucible.models.whisper_model - INFO - 开始百炼实时流式 ASR 任务: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:15:32,185 - Crucible.models.whisper_model - INFO - 正在启动百炼实时 ASR，使用模型: paraformer-realtime-v2
+2026-05-27 15:15:32,186 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已建立。
+2026-05-27 15:15:47,760 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已关闭。
+2026-05-27 15:15:47,760 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 识别完成，共生成 0 个片段，用时 15.59s
+2026-05-27 15:15:47,778 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:15:49,506 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 0 个核心概念，用时 1.71s
+2026-05-27 15:15:52,047 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:15:52,050 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:16:51,616 - Crucible.utils.audio_processor - INFO - 提取音频中: C:/Users/qingz/Downloads/38398462330-1-192.mp4
+2026-05-27 15:16:51,925 - Crucible.utils.audio_processor - INFO - 音频成功分离提取至: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:16:51,925 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼实时流式 ASR 服务，无需本地加载大模型。
+2026-05-27 15:16:51,940 - Crucible.models.whisper_model - INFO - 开始百炼实时流式 ASR 任务: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:16:51,952 - Crucible.models.whisper_model - INFO - 正在启动百炼实时 ASR，使用模型: paraformer-realtime-v2
+2026-05-27 15:16:51,954 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已建立。
+2026-05-27 15:17:26,820 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已关闭。
+2026-05-27 15:17:26,821 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 识别完成，共生成 2 个片段，用时 34.88s
+2026-05-27 15:17:26,841 - Crucible.models.vlm_analyzer - INFO - 开始分析视频关键帧 (共 3 个时间点)...
+2026-05-27 15:17:26,966 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 10.65s (索引 319)
+2026-05-27 15:17:29,993 - Crucible.models.vlm_analyzer - INFO - 时间轴 10.65s 分析完成:
+OCR: 无...
+描述: 这张图片展示了一对男女主持人在电视节目中的场景。两人站在一个色彩鲜艳的背景前，背景由蓝色、绿色和白色的几何图形组成。左侧的男性穿着蓝色衬衫，面带微笑，手持麦克风，似乎正在发言或准备发言。右侧的女性穿着...
+2026-05-27 15:17:30,074 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 53.27s (索引 1598)
+2026-05-27 15:17:33,613 - Crucible.models.vlm_analyzer - INFO - 时间轴 53.27s 分析完成:
+OCR: interstellar 穿越者
+梗百科 bilibili
+作者: @interstelOr穿越者
+很荣幸成为一名太空旅客
+包括但不限于黄景瑜
+下一站·太空
+NEXT STOP: SPACE...
+描述: 这张图片展示了一位穿着黑白相间运动夹克的男性，夹克上有蓝色和橙色的装饰线条。他的胸前有一个徽章，上面写着“黄景瑜”。背景是纯灰色，画面左上角有“interstellar 穿越者”的标志，右上角有“梗百...
+2026-05-27 15:17:33,673 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 95.88s (索引 2876)
+2026-05-27 15:17:38,731 - Crucible.models.vlm_analyzer - INFO - 时间轴 95.88s 分析完成:
+OCR: 无...
+描述: 这张图片展示了一个舞台活动的场景，三位男性站在舞台上。左侧的男性穿着白色T恤，戴着眼镜，手持麦克风正在讲话，表情专注。中间的男性穿着浅蓝色衬衫和白色裤子，面带微笑，双手交叠在身前。右侧的男性穿着带有亮...
+2026-05-27 15:17:38,743 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:17:39,771 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 0 个核心概念，用时 1.02s
+2026-05-27 15:17:43,157 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:17:43,158 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:19:15,036 - Crucible.utils.audio_processor - WARNING - 获取视频标题失败: https://【【梗百科】百万英镑是啥？这得花不少钱？！】https://www.bilibili.com/video/BV1WzG769EFM?vd_source=8bc084f764a43f8ae8245faeab0f29d4, 错误: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+2026-05-27 15:19:15,038 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://【【梗百科】百万英镑是啥？这得花不少钱？！】https://www.bilibili.com/video/BV1WzG769EFM?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 15:19:15,044 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 15:19:15,131 - Crucible.utils.audio_processor - ERROR - 在线 URL 下载失败: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1620, in extract_info
+    if not ie.suitable(url):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\lazy_extractors.py", line 15293, in suitable
+    qs = parse_qs(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\utils\_utils.py", line 2552, in parse_qs
+    return urllib.parse.parse_qs(urllib.parse.urlparse(url).query, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 393, in urlparse
+    splitresult = urlsplit(url, scheme, allow_fragments)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 489, in urlsplit
+    _checknetloc(netloc)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 434, in _checknetloc
+    raise ValueError("netloc '" + netloc + "' contains invalid " +
+ValueError: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+2026-05-27 15:19:15,270 - Crucible.utils.audio_processor - ERROR - 媒体预处理阶段失败: 在线媒体下载失败: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+2026-05-27 15:19:15,270 - Crucible_GUI - ERROR - 后台 AIWorker 执行中断: 在线媒体下载失败: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 140, in download_online_media
+    info = ydl.extract_info(url, download=True)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\YoutubeDL.py", line 1620, in extract_info
+    if not ie.suitable(url):
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\extractor\lazy_extractors.py", line 15293, in suitable
+    qs = parse_qs(url)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\yt_dlp\utils\_utils.py", line 2552, in parse_qs
+    return urllib.parse.parse_qs(urllib.parse.urlparse(url).query, **kwargs)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 393, in urlparse
+    splitresult = urlsplit(url, scheme, allow_fragments)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 489, in urlsplit
+    _checknetloc(netloc)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\urllib\parse.py", line 434, in _checknetloc
+    raise ValueError("netloc '" + netloc + "' contains invalid " +
+ValueError: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\gui.py", line 303, in run
+    wav_path = audio_processor.process_media(file_path, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 117, in process_media
+    raise e
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 98, in process_media
+    downloaded_file = self.download_online_media(media_path_or_url, temp_dir)
+  File "C:\Users\qingz\Desktop\Crucible\utils\audio_processor.py", line 152, in download_online_media
+    raise RuntimeError(f"在线媒体下载失败: {err_msg}")
+RuntimeError: 在线媒体下载失败: netloc '【【梗百科】百万英镑是啥？这得花不少钱？！】https:' contains invalid characters under NFKC normalization
+2026-05-27 15:19:31,427 - Crucible.utils.audio_processor - INFO - 检测到在线 URL: https://www.bilibili.com/video/BV1WzG769EFM?vd_source=8bc084f764a43f8ae8245faeab0f29d4，启动 yt-dlp 下载...
+2026-05-27 15:19:31,434 - Crucible.utils.audio_processor - INFO - 开始请求网络媒体数据...
+2026-05-27 15:19:33,026 - Crucible.utils.audio_processor - INFO - 网络媒体下载完成: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:19:33,027 - Crucible.utils.audio_processor - INFO - 转换音频格式中: C:\Users\qingz\Desktop\Crucible\temp\downloaded_temp_media.m4a
+2026-05-27 15:19:33,348 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼实时流式 ASR 服务，无需本地加载大模型。
+2026-05-27 15:19:33,363 - Crucible.models.whisper_model - INFO - 开始百炼实时流式 ASR 任务: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:19:33,375 - Crucible.models.whisper_model - INFO - 正在启动百炼实时 ASR，使用模型: paraformer-realtime-v2
+2026-05-27 15:19:33,377 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已建立。
+2026-05-27 15:19:48,809 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已关闭。
+2026-05-27 15:19:48,809 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 识别完成，共生成 0 个片段，用时 15.45s
+2026-05-27 15:19:48,823 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:19:49,758 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 0 个核心概念，用时 0.92s
+2026-05-27 15:19:54,097 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:19:54,100 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:26:40,089 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:26:40,091 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:27:00,096 - Crucible.utils.audio_processor - INFO - 提取音频中: C:/Users/qingz/Downloads/38398462330-1-192.mp4
+2026-05-27 15:27:00,403 - Crucible.utils.audio_processor - INFO - 音频成功分离提取至: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:27:00,403 - Crucible.models.whisper_model - INFO - 已切换为阿里云百炼实时流式 ASR 服务，无需本地加载大模型。
+2026-05-27 15:27:00,415 - Crucible.models.whisper_model - INFO - 开始百炼实时流式 ASR 任务: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 15:27:00,427 - Crucible.models.whisper_model - INFO - 音频参数: 16000Hz, 1ch, 16bit, 时长 106.5s
+2026-05-27 15:27:00,427 - Crucible.models.whisper_model - INFO - 正在启动百炼实时 ASR，使用模型: paraformer-realtime-v2
+2026-05-27 15:27:00,428 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已建立。
+2026-05-27 15:27:00,429 - Crucible.models.whisper_model - INFO - 开始流式发送 PCM 数据，每块 3200 bytes (100ms)，总计约 1065 块
+2026-05-27 15:28:07,887 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 连接已关闭。
+2026-05-27 15:28:07,888 - Crucible.models.whisper_model - INFO - 百炼实时 ASR 识别完成，共生成 2 个片段，用时 67.47s
+2026-05-27 15:28:07,905 - Crucible_GUI - INFO - ASR 识别结果（共 2 段，总字数 738）：
+2026-05-27 15:28:07,906 - Crucible_GUI - INFO -   [0.0s-60.0s]: 误闯天家这个家可不是最近一直爆火的嘉豪梗，而是知名主持人李维嘉。一些快本的老观众应该知道，早期他和何炅谢娜他们都是快本的台面助，如今呢也经常活跃在诸多综艺节目中
+2026-05-27 15:28:07,906 - Crucible_GUI - INFO -   [60.0s-106.5s]: 社会的名人大佬们一起交流畅谈，那性价比和牌面是不是更爆炸了？而且除了上天之外，到时候在海南文昌基地呢也会有可以带家人一起观看火箭发射的倩女研学专场，岂能说排面真
+2026-05-27 15:28:07,911 - Crucible.models.vlm_analyzer - INFO - 开始分析视频关键帧 (共 3 个时间点)...
+2026-05-27 15:28:08,019 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 10.65s (索引 319)
+2026-05-27 15:28:11,492 - Crucible.models.vlm_analyzer - INFO - 时间轴 10.65s 分析完成:
+OCR: 无...
+描述: 这张图片展示了一对男女主持人在电视节目中的场景。两人均手持麦克风，似乎正在进行对话或主持节目。左侧的男性穿着蓝色衬衫，面带微笑，目光看向右侧；右侧的女性穿着浅色上衣，佩戴耳环，表情专注，目光也朝向同一...
+2026-05-27 15:28:11,593 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 53.27s (索引 1598)
+2026-05-27 15:28:15,977 - Crucible.models.vlm_analyzer - INFO - 时间轴 53.27s 分析完成:
+OCR: interstellar 穿越者
+梗百科 bilibili
+作者: @interstellar穿越者
+很荣幸成为一名太空旅客
+包括但不限于黄景瑜
+下一站·太空
+NEXT STOP: SPACE...
+描述: 这张图片展示了一位穿着黑白相间运动夹克的男性，夹克上有蓝色和橙色的装饰线条。他的胸前有一个徽章，上面写着“黄景瑜”。背景是纯灰色，画面中有一些文字信息。左上角有“interstellar 穿越者”的标...
+2026-05-27 15:28:16,047 - Crucible.utils.video_processor - INFO - 成功提取视频帧: C:/Users/qingz/Downloads/38398462330-1-192.mp4 在 95.88s (索引 2876)
+2026-05-27 15:28:22,354 - Crucible.models.vlm_analyzer - INFO - 时间轴 95.88s 分析完成:
+OCR: 无...
+描述: 这张图片展示了一个舞台活动的场景，三位男性站在舞台上。左侧的男性穿着白色T恤，手持麦克风正在讲话，表情专注。中间的男性穿着浅蓝色衬衫和白色裤子，双手交叠在身前，面带微笑。右侧的男性穿着带有亮片装饰的白...
+2026-05-27 15:28:22,370 - Crucible.models.llm_core - INFO - 开始执行 [阶段一: 核心概念抽取]...
+2026-05-27 15:29:10,443 - Crucible.models.llm_core - INFO - 概念提取完成，共识别出 10 个核心概念，用时 48.06s
+2026-05-27 15:29:10,460 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 误闯天家
+2026-05-27 15:29:10,463 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:29:10,466 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 5 个概念路径。
+2026-05-27 15:29:10,467 - Crucible.models.llm_core - INFO - 概念 '误闯天家' 在知识库中是新笔记。
+2026-05-27 15:29:26,710 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\误闯天家.md
+2026-05-27 15:29:26,722 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:29:26,740 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 6 个概念路径。
+2026-05-27 15:29:26,740 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:29:36,831 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 65，是否合格: False。用时: 10.09s
+2026-05-27 15:29:36,851 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\误闯天家_backup_20260527_152936.md
+2026-05-27 15:29:36,855 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\误闯天家.md
+2026-05-27 15:29:36,855 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 李维嘉
+2026-05-27 15:29:36,856 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:29:36,869 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 6 个概念路径。
+2026-05-27 15:29:36,869 - Crucible.models.llm_core - INFO - 概念 '李维嘉' 在知识库中是新笔记。
+2026-05-27 15:29:49,229 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\李维嘉.md
+2026-05-27 15:29:49,241 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:29:49,260 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 7 个概念路径。
+2026-05-27 15:29:49,260 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:29:56,851 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 65，是否合格: False。用时: 7.59s
+2026-05-27 15:29:56,873 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\李维嘉_backup_20260527_152956.md
+2026-05-27 15:29:56,880 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\李维嘉.md
+2026-05-27 15:29:56,880 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 倩女幽魂手游
+2026-05-27 15:29:56,880 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:29:56,899 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 7 个概念路径。
+2026-05-27 15:29:56,900 - Crucible.models.llm_core - INFO - 概念 '倩女幽魂手游' 在知识库中是新笔记。
+2026-05-27 15:30:07,077 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\倩女幽魂手游.md
+2026-05-27 15:30:07,090 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:30:07,106 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 8 个概念路径。
+2026-05-27 15:30:07,106 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:30:14,915 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 7.81s
+2026-05-27 15:30:14,938 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\倩女幽魂手游_backup_20260527_153014.md
+2026-05-27 15:30:14,943 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\倩女幽魂手游.md
+2026-05-27 15:30:14,944 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 穿越者一号
+2026-05-27 15:30:14,944 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:30:14,965 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 8 个概念路径。
+2026-05-27 15:30:14,965 - Crucible.models.llm_core - INFO - 概念 '穿越者一号' 在知识库中是新笔记。
+2026-05-27 15:30:32,358 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\穿越者一号.md
+2026-05-27 15:30:32,375 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:30:32,396 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 9 个概念路径。
+2026-05-27 15:30:32,396 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:30:44,382 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 11.98s
+2026-05-27 15:30:44,405 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\穿越者一号_backup_20260527_153044.md
+2026-05-27 15:30:44,412 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\穿越者一号.md
+2026-05-27 15:30:44,412 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 商业载人航天
+2026-05-27 15:30:44,413 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:30:44,436 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 9 个概念路径。
+2026-05-27 15:30:44,437 - Crucible.models.llm_core - INFO - 概念 '商业载人航天' 在知识库中是新笔记。
+2026-05-27 15:30:58,443 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\商业载人航天.md
+2026-05-27 15:30:58,461 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:30:58,489 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 10 个概念路径。
+2026-05-27 15:30:58,489 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:31:07,424 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 8.93s
+2026-05-27 15:31:07,442 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\商业载人航天_backup_20260527_153107.md
+2026-05-27 15:31:07,450 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\商业载人航天.md
+2026-05-27 15:31:07,451 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 倩女研学专场
+2026-05-27 15:31:07,451 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:07,472 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 10 个概念路径。
+2026-05-27 15:31:07,473 - Crucible.models.llm_core - INFO - 概念 '倩女研学专场' 在知识库中是新笔记。
+2026-05-27 15:31:17,388 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\倩女研学专场.md
+2026-05-27 15:31:17,404 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:17,425 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 11 个概念路径。
+2026-05-27 15:31:17,426 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:31:23,453 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 70，是否合格: False。用时: 6.03s
+2026-05-27 15:31:23,477 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\倩女研学专场_backup_20260527_153123.md
+2026-05-27 15:31:23,485 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\倩女研学专场.md
+2026-05-27 15:31:23,486 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 黄景瑜
+2026-05-27 15:31:23,486 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:23,507 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 11 个概念路径。
+2026-05-27 15:31:23,508 - Crucible.models.llm_core - INFO - 概念 '黄景瑜' 在知识库中是新笔记。
+2026-05-27 15:31:33,266 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\黄景瑜.md
+2026-05-27 15:31:33,282 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:33,305 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 12 个概念路径。
+2026-05-27 15:31:33,305 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:31:40,182 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 6.88s
+2026-05-27 15:31:40,204 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\黄景瑜_backup_20260527_153140.md
+2026-05-27 15:31:40,210 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\黄景瑜.md
+2026-05-27 15:31:40,210 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 智媛机器人
+2026-05-27 15:31:40,211 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:40,230 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 12 个概念路径。
+2026-05-27 15:31:40,231 - Crucible.models.llm_core - INFO - 概念 '智媛机器人' 在知识库中是新笔记。
+2026-05-27 15:31:52,786 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\智媛机器人.md
+2026-05-27 15:31:52,800 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:31:52,823 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 13 个概念路径。
+2026-05-27 15:31:52,823 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:32:00,541 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 7.72s
+2026-05-27 15:32:00,561 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\智媛机器人_backup_20260527_153200.md
+2026-05-27 15:32:00,568 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\智媛机器人.md
+2026-05-27 15:32:00,570 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 正佳集团CEO
+2026-05-27 15:32:00,570 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:32:00,598 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 13 个概念路径。
+2026-05-27 15:32:00,598 - Crucible.models.llm_core - INFO - 概念 '正佳集团CEO' 在知识库中是新笔记。
+2026-05-27 15:32:10,733 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\正佳集团CEO.md
+2026-05-27 15:32:10,746 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:32:10,768 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 14 个概念路径。
+2026-05-27 15:32:10,769 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:32:16,911 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 30，是否合格: False。用时: 6.14s
+2026-05-27 15:32:16,938 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\正佳集团CEO_backup_20260527_153216.md
+2026-05-27 15:32:16,944 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\正佳集团CEO.md
+2026-05-27 15:32:16,944 - Crucible.models.llm_core - INFO - 开始执行 [阶段二: 智能合并笔记] -> 概念: 梗百科
+2026-05-27 15:32:16,944 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:32:16,968 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 14 个概念路径。
+2026-05-27 15:32:16,969 - Crucible.models.llm_core - INFO - 概念 '梗百科' 在知识库中是新笔记。
+2026-05-27 15:32:30,166 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\梗百科.md
+2026-05-27 15:32:30,180 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 15:32:30,200 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 15 个概念路径。
+2026-05-27 15:32:30,201 - Crucible.models.fact_checker - INFO - 开始执行 [AI 事实一致性核对 (LLM-as-a-Judge)]...
+2026-05-27 15:32:37,206 - Crucible.models.fact_checker - INFO - 事实一致性校验完毕。得分: 40，是否合格: False。用时: 7.01s
+2026-05-27 15:32:37,229 - Crucible.utils.wiki_editor - INFO - 原文件已成功备份至: C:\Users\qingz\Desktop\Crucible\data\backups\梗百科_backup_20260527_153237.md
+2026-05-27 15:32:37,235 - Crucible.utils.wiki_editor - INFO - 原子化写入 Wiki 成功: C:\Users\qingz\Desktop\Crucible\data\vault\梗百科.md

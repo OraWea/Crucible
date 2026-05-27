@@ -280,13 +280,21 @@ class AIWorker(QThread):
             self.progress_signal.emit(">>> Crucible AI 工作流启动 ...", 5)
             
             for file_path in self.file_paths:
-                if not os.path.exists(file_path):
+                is_url = file_path.startswith(('http://', 'https://'))
+                if not is_url and not os.path.exists(file_path):
                     continue
                 
-                filename = os.path.basename(file_path)
-                ext = os.path.splitext(filename)[1].lower()
-                
-                self.progress_signal.emit(f"开始处理源文件: {filename}", 10)
+                if is_url:
+                    self.progress_signal.emit("正在解析在线视频标题...", 12)
+                    video_title = audio_processor.get_video_title(file_path)
+                    filename = f"[视频]{video_title}"
+                    # yt-dlp 默认下载 bestaudio 格式（通常是 .m4a），属于音频格式
+                    ext = ".m4a"
+                    self.progress_signal.emit(f"开始处理在线视频: {video_title}", 15)
+                else:
+                    filename = os.path.basename(file_path)
+                    ext = os.path.splitext(filename)[1].lower()
+                    self.progress_signal.emit(f"开始处理源文件: {filename}", 10)
                 
                 # 分流处理：音视频 VS 纯文档
                 if ext in Config.SUPPORTED_VIDEO_FORMATS or ext in Config.SUPPORTED_AUDIO_FORMATS:
@@ -302,6 +310,13 @@ class AIWorker(QThread):
                     
                     # 拼接 ASR 文本作为输入源
                     full_source_text = "\n".join([f"[{seg['start']}-{seg['end']}s]: {seg['text']}" for seg in segments])
+                    
+                    # 调试日志：打印 ASR 识别结果概要
+                    logger.info(f"ASR 识别结果（共 {len(segments)} 段，总字数 {len(full_source_text)}）：")
+                    for seg in segments[:5]:  # 最多打印前5段
+                        logger.info(f"  [{seg['start']:.1f}s-{seg['end']:.1f}s]: {seg['text'][:80]}")
+                    if len(segments) > 5:
+                        logger.info(f"  ... 还有 {len(segments)-5} 段未显示")
                     
                     # 3. 如果是视频文件，调用 VLM 场景感知
                     vlm_contexts = {}
@@ -466,6 +481,16 @@ class MainWindow(QMainWindow):
         upload_vbox.addWidget(self.btn_select_file, alignment=Qt.AlignmentFlag.AlignCenter)
         workbench_layout.addWidget(self.upload_frame)
 
+        # 新增 URL 输入行
+        url_layout = QHBoxLayout()
+        self.txt_url_input = QLineEdit()
+        self.txt_url_input.setPlaceholderText("在此输入或粘贴视频 URL 链接 (如 Bilibili、YouTube)...")
+        self.btn_add_url = QPushButton("添加链接")
+        self.btn_add_url.setFixedWidth(80)
+        url_layout.addWidget(self.txt_url_input)
+        url_layout.addWidget(self.btn_add_url)
+        workbench_layout.addLayout(url_layout)
+
         # 文件列表展示
         self.lbl_selected = QLabel("未选择任何文件")
         self.lbl_selected.setStyleSheet("color: #a3a3a3; font-size: 12px; margin-top: 5px;")
@@ -572,6 +597,8 @@ class MainWindow(QMainWindow):
         self.btn_weave.clicked.connect(self.start_ai_flow)
         self.tree_view.doubleClicked.connect(self.load_selected_note)
         self.btn_save_note.clicked.connect(self.save_note_modifications)
+        self.btn_add_url.clicked.connect(self.add_url_manually)
+        self.txt_url_input.returnPressed.connect(self.add_url_manually)
 
         # 覆写窗口拖拽拖放事件
         self.upload_frame.dragEnterEvent = self.dragEnterEvent
@@ -857,9 +884,53 @@ class MainWindow(QMainWindow):
             "Supported Files (*.mp4 *.mkv *.mp3 *.wav *.pdf *.txt *.md);;All Files (*)"
         )
         if files:
-            self.selected_files = files
-            self.lbl_selected.setText(f"已选择 {len(files)} 个文件:\n" + "\n".join([os.path.basename(f) for f in files]))
+            for file in files:
+                if file not in self.selected_files:
+                    self.selected_files.append(file)
+            self.update_selected_list_display()
             self.console_log.append(f">> Selected files: {files}")
+
+    def add_url_manually(self) -> bool:
+        """手动添加输入的在线 URL"""
+        url = self.txt_url_input.text().strip()
+        if not url:
+            return True
+            
+        # 自动补全协议头：如果包含 "." 且不含空格，且不以 http:// 或 https:// 开头
+        if not url.startswith(('http://', 'https://')):
+            if (' ' not in url and '.' in url) or url.startswith('www.'):
+                url = 'https://' + url
+            
+        import re
+        url_pattern = re.compile(r'^https?://\S+$', re.IGNORECASE)
+        if not url_pattern.match(url):
+            QMessageBox.warning(self, "输入错误", "输入的不是合法的 HTTP/HTTPS 链接！")
+            return False
+            
+        if url in self.selected_files:
+            QMessageBox.information(self, "操作提示", "该链接已经存在于待处理列表中。")
+            return True
+            
+        self.selected_files.append(url)
+        self.update_selected_list_display()
+        self.txt_url_input.clear()
+        self.console_log.append(f">> 已添加在线视频 URL 至待处理列表: {url}")
+        return True
+
+    def update_selected_list_display(self):
+        """漂亮地更新已选择/解析的文件与链接列表展示"""
+        if not self.selected_files:
+            self.lbl_selected.setText("未选择任何文件或链接")
+            return
+            
+        display_texts = []
+        for item in self.selected_files:
+            if item.startswith(('http://', 'https://')):
+                display_texts.append(f"🔗 链接: {item}")
+            else:
+                display_texts.append(f"📄 文件: {os.path.basename(item)}")
+                
+        self.lbl_selected.setText(f"已选择 {len(self.selected_files)} 个源:\n" + "\n".join(display_texts))
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -872,12 +943,19 @@ class MainWindow(QMainWindow):
             if os.path.exists(local_path):
                 files.append(local_path)
         if files:
-            self.selected_files = files
-            self.lbl_selected.setText(f"已拖入 {len(files)} 个文件:\n" + "\n".join([os.path.basename(f) for f in files]))
+            for file in files:
+                if file not in self.selected_files:
+                    self.selected_files.append(file)
+            self.update_selected_list_display()
             self.console_log.append(f">> Dropped files: {files}")
 
     def start_ai_flow(self):
         """启动后台 ASR + VLM + LLM 推理异步子线程"""
+        # 如果 URL 输入框中存有内容，自动触发添加动作
+        if self.txt_url_input.text().strip():
+            if not self.add_url_manually():
+                return  # 校验失败，直接返回以避免弹出“请拖入文件”的二次提示
+
         if not self.selected_files:
             QMessageBox.warning(self, "操作提示", "请先拖入或选择需要提炼的源视频或文档文件！")
             return
