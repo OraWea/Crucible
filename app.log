@@ -1,0 +1,45 @@
+2026-05-27 13:36:48,953 - Crucible_GUI - INFO - 系统检测到空库，已自动注入默认账户 admin(管理员) 与 user(普通用户)。
+2026-05-27 13:37:26,290 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:37:26,291 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 0 个概念路径。
+2026-05-27 13:42:33,312 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:42:33,313 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 0 个概念路径。
+2026-05-27 13:46:42,610 - Crucible.utils.fs_router - INFO - 开始扫描 Obsidian 知识库: C:\Users\qingz\Desktop\Crucible\data\vault
+2026-05-27 13:46:42,612 - Crucible.utils.fs_router - INFO - 知识库扫描完成，索引了 0 个概念路径。
+2026-05-27 13:51:31,245 - Crucible.utils.audio_processor - INFO - 提取音频中: C:/Users/qingz/Downloads/35895576580-1-192.mp4
+2026-05-27 13:51:34,048 - Crucible.utils.audio_processor - INFO - 音频成功分离提取至: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:51:34,049 - Crucible.models.whisper_model - INFO - 正在加载 Whisper ASR 模型: base (设备: cpu)
+2026-05-27 13:51:35,254 - Crucible.models.whisper_model - INFO - Whisper base 模型加载成功。
+2026-05-27 13:51:35,264 - Crucible.models.whisper_model - INFO - 开始 Whisper 转写: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:51:35,413 - Crucible.models.whisper_model - ERROR - Whisper 转录失败: Unsupported language: auto
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\models\whisper_model.py", line 61, in transcribe
+    result = self.model.transcribe(audio_path, **options)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\whisper\transcribe.py", line 161, in transcribe
+    tokenizer = get_tokenizer(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\whisper\tokenizer.py", line 380, in get_tokenizer
+    raise ValueError(f"Unsupported language: {language}")
+ValueError: Unsupported language: auto
+2026-05-27 13:51:35,457 - Crucible_GUI - ERROR - 后台 AIWorker 执行中断: Unsupported language: auto
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\gui.py", line 274, in run
+    segments = transcriber.transcribe(wav_path, language=self.whisper_lang)
+  File "C:\Users\qingz\Desktop\Crucible\models\whisper_model.py", line 85, in transcribe
+    raise e
+  File "C:\Users\qingz\Desktop\Crucible\models\whisper_model.py", line 61, in transcribe
+    result = self.model.transcribe(audio_path, **options)
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\whisper\transcribe.py", line 161, in transcribe
+    tokenizer = get_tokenizer(
+  File "C:\Users\qingz\AppData\Local\Programs\Python\Python39\lib\site-packages\whisper\tokenizer.py", line 380, in get_tokenizer
+    raise ValueError(f"Unsupported language: {language}")
+ValueError: Unsupported language: auto
+2026-05-27 13:51:51,616 - Crucible.utils.audio_processor - INFO - 提取音频中: C:/Users/qingz/Downloads/35895576580-1-192.mp4
+2026-05-27 13:51:51,830 - Crucible.utils.audio_processor - INFO - 音频成功分离提取至: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:51:51,831 - Crucible.models.whisper_model - INFO - 正在加载 Whisper ASR 模型: base (设备: cpu)
+2026-05-27 13:51:52,829 - Crucible.models.whisper_model - INFO - Whisper base 模型加载成功。
+2026-05-27 13:51:52,846 - Crucible.models.whisper_model - INFO - 开始 Whisper 转写: C:\Users\qingz\Desktop\Crucible\temp\processed_audio.wav
+2026-05-27 13:52:48,615 - Crucible.models.whisper_model - INFO - Whisper 转写完成，共生成 1 个片段，用时 55.77s
+2026-05-27 13:52:48,630 - Crucible_GUI - ERROR - 后台 AIWorker 执行中断: 'AudioProcessor' object has no attribute 'get_audio_duration'
+Traceback (most recent call last):
+  File "C:\Users\qingz\Desktop\Crucible\gui.py", line 284, in run
+    duration = audio_processor.get_audio_duration(wav_path)
+AttributeError: 'AudioProcessor' object has no attribute 'get_audio_duration'
