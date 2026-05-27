@@ -1,0 +1,57 @@
+name: 🐛 故障报告 (Bug Report)
+description: 提交软件运行中的错误或异常行为
+title: "[BUG]: <简短描述你的问题>"
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提交 Bug 报告！为了帮我们快速定位并解决问题，请尽可能详细地填写以下表单。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 错误描述
+      description: 清楚且简明地描述这个 Bug 是什么。
+      placeholder: 当我拖入一个超过 2 小时的 MP4 视频时...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 请提供你当前运行 Crucible 的硬件与系统环境。
+      placeholder: |
+        - OS: Windows 11 / Ubuntu 24.04
+        - Python Version: 3.10.12
+        - PyTorch Version: 2.1 (CUDA 12.1 / CPU)
+        - Hardware: RTX 4060 Ti 16G
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误日志 (Traceback)
+      description: 请粘贴 PyQt6 控制台或 Python 终端输出的完整报错日志。
+      placeholder: |
+        ```text
+        Traceback (most recent call last):
+          File "models/whisper_model.py", line 42, in decode...
+        IndexError: list index out of range
+        ```
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前自我审查
+      options:
+        - label: 我已经确认当前使用的是最新版本的 Crucible 代码。
+          required: true
+        - label: 我已经在现有 Issue 列表中搜索过，确认没有重复的报告。
+          required: true

@@ -1,0 +1,30 @@
+name: 🚀 核心功能提案 (Feature Request)
+description: 为 Crucible 提出新的多模态或知识库合并功能构想
+title: "[FEATURE]: <简短描述你的新点子>"
+labels: ["enhancement"]
+
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你的这个需求与什么痛点有关？
+      description: 请清晰描述目前的系统在什么场景下无法满足你的效率需求。
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 理想中的解决方案
+      description: 你希望 Crucible 增加什么操作、API、或是新的 AI 工作流？
+      placeholder: 希望在 `llm_core.py` 中引入对大模型流式输出 (Streaming) 的支持...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选替代方案
+      description: 你目前是如何绕过这个痛点的（例如使用其他第三方脚本）？
+    validations:
+      required: false
