@@ -4,7 +4,8 @@ import logging
 import datetime
 import tempfile
 import re
-from typing import Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 from markdown_it import MarkdownIt
 from Crucible.config import Config
 
@@ -99,16 +100,106 @@ class WikiEditor:
         """
         从笔记文本中正则解析出所有的 Obsidian 双向链接 (格式为 [[链接概念]])
         """
-        # 匹配 [[双向链接]] 或是 [[双向链接|别名]]
-        pattern = r'\[\[(.*?)\]\]'
-        matches = re.findall(pattern, content)
         links = []
-        for match in matches:
-            # 如果包含管道符 '|' 别名，取实际的目标概念名
-            concept = match.split('|')[0].strip()
-            if concept and concept not in links:
-                links.append(concept)
+        for item in self.extract_wiki_link_items(content):
+            target = item["target"]
+            if target and target not in links:
+                links.append(target)
         return links
+
+    def extract_wiki_link_items(self, content: str) -> List[Dict[str, str]]:
+        """解析 [[Note]]、[[Note|Alias]]、[[Note#Heading|Label]]。"""
+        items = []
+        for match in re.findall(r'\[\[(.*?)\]\]', content or ""):
+            raw_target, alias = (match.split("|", 1) + [""])[:2] if "|" in match else (match, "")
+            target, anchor = (raw_target.split("#", 1) + [""])[:2] if "#" in raw_target else (raw_target, "")
+            target = target.strip()
+            anchor = anchor.strip()
+            alias = alias.strip()
+            items.append({
+                "raw": match.strip(),
+                "target": target,
+                "anchor": anchor,
+                "alias": alias,
+                "label": alias or anchor or target,
+            })
+        return items
+
+    def read_frontmatter(self, content: str) -> Dict[str, Any]:
+        """读取简单 YAML frontmatter，支持标量和一维列表。"""
+        match = re.match(r'^---\s*\n(.*?)\n---\s*\n?', content or "", re.DOTALL)
+        if not match:
+            return {}
+        data: Dict[str, Any] = {}
+        for line in match.group(1).splitlines():
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                data[key] = [
+                    item.strip().strip('"').strip("'")
+                    for item in value[1:-1].split(",")
+                    if item.strip()
+                ]
+            else:
+                data[key] = value.strip('"').strip("'")
+        return data
+
+    def render_markdown_preview(self, content: str) -> str:
+        """将 Markdown 渲染为 HTML，并把 Obsidian 双链转换为可点击链接。"""
+        def replace_link(match):
+            item = self.extract_wiki_link_items(f"[[{match.group(1)}]]")[0]
+            href = quote(item["raw"], safe="")
+            return f"[{item['label']}](crucible://note/{href})"
+
+        normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, content or "")
+        return self.md_parser.render(normalized)
+
+    def update_frontmatter_fields(self, content: str, fields: Dict[str, Any]) -> str:
+        """更新或创建 Markdown YAML frontmatter 中的简单标量字段。"""
+        field_lines = [f"{key}: {value}" for key, value in fields.items()]
+        match = re.match(r'^---\s*\n(.*?)\n---\s*\n?', content, re.DOTALL)
+
+        if not match:
+            return "---\n" + "\n".join(field_lines) + "\n---\n\n" + content.lstrip()
+
+        yaml_text = match.group(1)
+        body = content[match.end():]
+        for key, value in fields.items():
+            pattern = rf'^{re.escape(key)}:\s*.*$'
+            replacement = f"{key}: {value}"
+            if re.search(pattern, yaml_text, flags=re.MULTILINE):
+                yaml_text = re.sub(pattern, replacement, yaml_text, flags=re.MULTILINE)
+            else:
+                yaml_text = yaml_text.rstrip() + f"\n{replacement}"
+
+        return f"---\n{yaml_text.strip()}\n---\n{body}"
+
+    def update_frontmatter_list_fields(self, content: str, fields: Dict[str, list]) -> str:
+        """合并更新 frontmatter 中的一维字符串列表字段。"""
+        scalar_fields = {}
+        for key, values in fields.items():
+            existing_values = self._read_frontmatter_list(content, key)
+            merged = []
+            for value in existing_values + [str(item) for item in values if item]:
+                if value not in merged:
+                    merged.append(value)
+            quoted = [f'"{item.replace(chr(34), chr(92) + chr(34))}"' for item in merged]
+            scalar_fields[key] = "[" + ", ".join(quoted) + "]"
+        return self.update_frontmatter_fields(content, scalar_fields)
+
+    def _read_frontmatter_list(self, content: str, key: str) -> list:
+        match = re.match(r'^---\s*\n(.*?)\n---\s*\n?', content, re.DOTALL)
+        if not match:
+            return []
+        yaml_text = match.group(1)
+        field_match = re.search(rf'^{re.escape(key)}:\s*\[(.*?)\]\s*$', yaml_text, re.MULTILINE)
+        if not field_match:
+            return []
+        raw_items = field_match.group(1).split(",")
+        return [item.strip().strip('"').strip("'") for item in raw_items if item.strip()]
 
 # 实例化单例
 wiki_editor = WikiEditor()

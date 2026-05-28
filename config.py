@@ -1,3 +1,4 @@
+import json
 import os
 from dotenv import load_dotenv
 
@@ -13,6 +14,7 @@ class Config:
     
     # 数据库路径 (仅用于存储系统操作日志与任务指标)
     DATABASE_PATH = os.environ.get('DATABASE_PATH') or os.path.join(BASE_DIR, 'data', 'crucible.db')
+    LOCAL_SETTINGS_PATH = os.environ.get('LOCAL_SETTINGS_PATH') or os.path.join(BASE_DIR, 'data', 'local_settings.json')
     
     # 临时文件夹与日志路径
     TEMP_DIR = os.path.join(BASE_DIR, 'temp')
@@ -32,6 +34,66 @@ class Config:
     LLM_API_KEY = os.environ.get('LLM_API_KEY') or 'your-api-key'
     LLM_API_BASE = os.environ.get('LLM_API_BASE') or 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME') or 'qwen-plus' # 可更换为 qwen2.5-72b-instruct 等
+    LLM_PROVIDER = os.environ.get('LLM_PROVIDER') or 'dashscope'
+    VLM_MODEL_NAME = os.environ.get('VLM_MODEL_NAME') or os.environ.get('LLM_MODEL_NAME') or 'qwen-vl-plus'
+    FACT_CHECKER_MODEL_NAME = os.environ.get('FACT_CHECKER_MODEL_NAME') or os.environ.get('LLM_MODEL_NAME') or 'qwen-plus'
+
+    PROVIDER_PRESETS = {
+        'openai': {
+            'label': 'OpenAI',
+            'api_base': 'https://api.openai.com/v1',
+            'model': 'gpt-4o-mini',
+            'vlm_model': 'gpt-4o-mini',
+        },
+        'dashscope': {
+            'label': 'DashScope / Qwen',
+            'api_base': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            'model': 'qwen-plus',
+            'vlm_model': 'qwen-vl-plus',
+        },
+        'deepseek': {
+            'label': 'DeepSeek',
+            'api_base': 'https://api.deepseek.com',
+            'model': 'deepseek-chat',
+            'vlm_model': 'deepseek-chat',
+        },
+        'moonshot': {
+            'label': 'Moonshot / Kimi',
+            'api_base': 'https://api.moonshot.cn/v1',
+            'model': 'moonshot-v1-8k',
+            'vlm_model': 'moonshot-v1-8k',
+        },
+        'zhipu': {
+            'label': 'Zhipu / GLM',
+            'api_base': 'https://open.bigmodel.cn/api/paas/v4',
+            'model': 'glm-4-flash',
+            'vlm_model': 'glm-4v-flash',
+        },
+        'openrouter': {
+            'label': 'OpenRouter',
+            'api_base': 'https://openrouter.ai/api/v1',
+            'model': 'openai/gpt-4o-mini',
+            'vlm_model': 'openai/gpt-4o-mini',
+        },
+        'ollama': {
+            'label': 'Ollama (local)',
+            'api_base': 'http://127.0.0.1:11434/v1',
+            'model': 'qwen2.5:7b',
+            'vlm_model': 'llava:7b',
+        },
+        'lmstudio': {
+            'label': 'LM Studio (local)',
+            'api_base': 'http://127.0.0.1:1234/v1',
+            'model': 'local-model',
+            'vlm_model': 'local-model',
+        },
+        'custom': {
+            'label': 'Custom OpenAI-compatible',
+            'api_base': LLM_API_BASE,
+            'model': LLM_MODEL_NAME,
+            'vlm_model': VLM_MODEL_NAME,
+        },
+    }
     
     # 支持处理的文件格式
     SUPPORTED_VIDEO_FORMATS = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
@@ -43,9 +105,123 @@ class Config:
     BACKUP_DIR = os.path.join(BASE_DIR, 'data', 'backups')
 
     @staticmethod
+    def has_valid_api_key(api_key: str = None) -> bool:
+        """判断 API Key 是否可用于云端模型调用。"""
+        if Config.LLM_PROVIDER in ('ollama', 'lmstudio'):
+            return True
+        value = api_key if api_key is not None else Config.LLM_API_KEY
+        return bool(value and value.strip() and value.strip() != 'your-api-key')
+
+    @staticmethod
     def init_paths():
         """初始化项目所需的各文件夹路径"""
         os.makedirs(Config.OBSIDIAN_VAULT_PATH, exist_ok=True)
         os.makedirs(os.path.dirname(Config.DATABASE_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(Config.LOCAL_SETTINGS_PATH), exist_ok=True)
         os.makedirs(Config.TEMP_DIR, exist_ok=True)
         os.makedirs(Config.BACKUP_DIR, exist_ok=True)
+
+    @staticmethod
+    def update_llm_runtime(
+        api_key: str = None,
+        api_base: str = None,
+        model_name: str = None,
+        provider: str = None,
+        vlm_model_name: str = None,
+        fact_checker_model_name: str = None,
+    ):
+        """更新运行期 LLM 配置，供 GUI 临时覆盖使用。"""
+        if api_key is not None:
+            Config.LLM_API_KEY = api_key
+        if api_base is not None:
+            Config.LLM_API_BASE = api_base
+        if model_name is not None:
+            Config.LLM_MODEL_NAME = model_name
+        if provider is not None:
+            Config.LLM_PROVIDER = provider
+        if vlm_model_name is not None:
+            Config.VLM_MODEL_NAME = vlm_model_name
+        if fact_checker_model_name is not None:
+            Config.FACT_CHECKER_MODEL_NAME = fact_checker_model_name
+
+    @staticmethod
+    def load_local_settings():
+        """载入本地运行配置；该文件应被 git 忽略，可保存真实 API Key。"""
+        if not os.path.exists(Config.LOCAL_SETTINGS_PATH):
+            return
+
+        try:
+            with open(Config.LOCAL_SETTINGS_PATH, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+        except Exception:
+            return
+
+        Config.update_llm_runtime(
+            api_key=settings.get("api_key"),
+            api_base=settings.get("api_base"),
+            model_name=settings.get("llm_model"),
+            provider=settings.get("provider"),
+            vlm_model_name=settings.get("vlm_model"),
+            fact_checker_model_name=settings.get("fact_model"),
+        )
+        if settings.get("vault_path"):
+            Config.OBSIDIAN_VAULT_PATH = settings["vault_path"]
+        if settings.get("whisper_model"):
+            Config.WHISPER_MODEL_NAME = settings["whisper_model"]
+        if settings.get("whisper_device"):
+            Config.WHISPER_DEVICE = settings["whisper_device"]
+
+    @staticmethod
+    def save_local_settings(
+        provider: str,
+        api_base: str,
+        llm_model: str,
+        vlm_model: str,
+        fact_model: str,
+        api_key: str = None,
+    ):
+        """保存 GUI 中的模型配置到本地配置文件。"""
+        os.makedirs(os.path.dirname(Config.LOCAL_SETTINGS_PATH), exist_ok=True)
+        settings = {
+            "provider": provider,
+            "api_base": api_base,
+            "llm_model": llm_model,
+            "vlm_model": vlm_model,
+            "fact_model": fact_model,
+            "vault_path": Config.OBSIDIAN_VAULT_PATH,
+            "whisper_model": Config.WHISPER_MODEL_NAME,
+            "whisper_device": Config.WHISPER_DEVICE,
+        }
+        if api_key:
+            settings["api_key"] = api_key
+        elif os.path.exists(Config.LOCAL_SETTINGS_PATH):
+            try:
+                with open(Config.LOCAL_SETTINGS_PATH, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                if existing.get("api_key"):
+                    settings["api_key"] = existing["api_key"]
+            except Exception:
+                settings.pop("api_key", None)
+
+        with open(Config.LOCAL_SETTINGS_PATH, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def get_provider_options():
+        """返回 GUI 可展示的 Provider 选项。"""
+        return [(key, value['label']) for key, value in Config.PROVIDER_PRESETS.items()]
+
+    @staticmethod
+    def get_provider_preset(provider: str):
+        """按 Provider key 获取 OpenAI-compatible 预设。"""
+        if provider == 'custom':
+            return {
+                'label': 'Custom OpenAI-compatible',
+                'api_base': Config.LLM_API_BASE,
+                'model': Config.LLM_MODEL_NAME,
+                'vlm_model': Config.VLM_MODEL_NAME,
+            }
+        return Config.PROVIDER_PRESETS.get(provider, Config.PROVIDER_PRESETS['custom'])
+
+
+Config.load_local_settings()

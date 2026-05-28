@@ -1,17 +1,22 @@
 import logging
-import json
 import time
-import requests
 from Crucible.config import Config
 from Crucible.utils.db_manager import db_manager
+from Crucible.models.api_client import llm_client, parse_json_response
 
 logger = logging.getLogger(__name__)
 
 class FactChecker:
     def __init__(self):
-        self.api_key = Config.LLM_API_KEY
-        self.api_base = Config.LLM_API_BASE
-        self.model_name = Config.LLM_MODEL_NAME
+        self.client = llm_client
+
+    @property
+    def api_key(self) -> str:
+        return self.client.api_key
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        self.client.configure(api_key=value)
 
     def check_consistency(self, original_source_text: str, generated_wiki_content: str) -> dict:
         """
@@ -59,41 +64,25 @@ class FactChecker:
   "reason": "审查判定的简短中文理由，指出具体哪些点存在冲突或完美契合"
 }}
 """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.0  # 设为 0 以保证裁判评分的稳定性与确定性
-        }
-
         default_fallback = {
-            "score": 85,
-            "consistent": True,
-            "reason": "评估超时或接口异常，执行安全通过（保底评分）"
+            "score": 0,
+            "consistent": False,
+            "reason": "评估超时或接口异常，未完成事实一致性校验"
         }
 
         try:
-            response = requests.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=30)
-            if response.status_code != 200:
-                raise RuntimeError(f"Fact Checker API 失败: {response.text}")
-                
-            resp_json = response.json()
-            content = resp_json['choices'][0]['message']['content'].strip()
-            
-            # 清理可能的 markdown 标记
-            if content.startswith("```"):
-                lines = content.split("\n")
-                if lines[0].startswith("```json") or lines[0].startswith("```"):
-                    lines = lines[1:-1]
-                content = "\n".join(lines).strip()
-                
-            result = json.loads(content)
+            content = self.client.chat(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                model_name=Config.FACT_CHECKER_MODEL_NAME,
+                temperature=0.0,
+                timeout=30,
+            )
+            result = parse_json_response(content)
+            if not isinstance(result, dict):
+                raise ValueError("事实核查结果必须是 JSON 对象")
             duration = time.time() - start_time
             
             logger.info(f"事实一致性校验完毕。得分: {result.get('score')}，是否合格: {result.get('consistent')}。用时: {duration:.2f}s")

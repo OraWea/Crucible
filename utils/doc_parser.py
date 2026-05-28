@@ -5,9 +5,6 @@ from pypdf import PdfReader
 logger = logging.getLogger(__name__)
 
 class DocParser:
-    def __init__(self):
-        pass
-
     def parse_file(self, file_path: str) -> str:
         """
         根据文件类型解析文本内容
@@ -42,7 +39,7 @@ class DocParser:
             return combined_text
         except Exception as e:
             logger.error(f"PDF 解析失败: {e}", exc_info=True)
-            raise e
+            raise
 
     def _parse_text(self, file_path: str) -> str:
         """解析 TXT 或 MD 并提取文本"""
@@ -61,7 +58,7 @@ class DocParser:
             raise UnicodeDecodeError("所有常用编码格式均解析文本失败，请确保文件是合法的文本内容。")
         except Exception as e:
             logger.error(f"文本读取失败: {e}", exc_info=True)
-            raise e
+            raise
 
 # 实例化单例
 doc_parser = DocParser()

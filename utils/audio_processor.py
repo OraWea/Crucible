@@ -1,9 +1,7 @@
 import os
 import logging
 import subprocess
-import shutil
 from pydub import AudioSegment
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +13,9 @@ class AudioProcessor:
     def check_ffmpeg(self) -> bool:
         """检查系统中是否安装并配置了 FFmpeg"""
         try:
-            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True)
+            result = subprocess.run(['ffmpeg', '-version'], capture_output=True, text=True, timeout=10)
             return result.returncode == 0
-        except FileNotFoundError:
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
     def extract_audio_from_video(self, video_path: str, output_path: str) -> str:
@@ -53,7 +51,7 @@ class AudioProcessor:
                 '-y',                       # 覆盖输出
                 output_path
             ]
-            result = subprocess.run(command, capture_output=True, text=True)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=1800)
             if result.returncode != 0:
                 raise RuntimeError(f"FFmpeg 运行失败: {result.stderr}")
                 
@@ -62,7 +60,7 @@ class AudioProcessor:
             
         except Exception as e:
             logger.error(f"提取视频音频失败: {e}", exc_info=True)
-            raise e
+            raise
 
     def convert_audio_format(self, input_path: str, output_path: str, sample_rate: int = 16000) -> str:
         """
@@ -81,7 +79,7 @@ class AudioProcessor:
             return output_path
         except Exception as e:
             logger.error(f"音频格式转换失败: {e}", exc_info=True)
-            raise e
+            raise
 
     def process_media(self, media_path_or_url: str, temp_dir: str) -> str:
         """
@@ -114,7 +112,7 @@ class AudioProcessor:
                 
         except Exception as e:
             logger.error(f"媒体预处理阶段失败: {e}")
-            raise e
+            raise
 
     def download_online_media(self, url: str, output_dir: str) -> str:
         """

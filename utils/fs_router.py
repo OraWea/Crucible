@@ -1,12 +1,14 @@
 import os
 import re
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from Crucible.config import Config
 
 logger = logging.getLogger(__name__)
 
 class FSRouter:
+    ORGANIZATION_RULES_FILENAME = "_crucible_organization_rules.md"
+
     def __init__(self, vault_path: str = Config.OBSIDIAN_VAULT_PATH):
         self.vault_path = vault_path
         # 建立缓存，映射 "概念名" -> "文件绝对路径"
@@ -37,6 +39,103 @@ class FSRouter:
                         self.concept_cache[alias.lower()] = file_path
 
         logger.info(f"知识库扫描完成，索引了 {len(self.concept_cache)} 个概念路径。")
+
+    def _safe_join_vault(self, relative_path: str) -> str:
+        """把相对路径解析到 vault 内，防止路径穿越。"""
+        cleaned = (relative_path or "").strip().replace("\\", os.sep).replace("/", os.sep)
+        cleaned = cleaned.lstrip("\\/")
+        abs_path = os.path.abspath(os.path.join(self.vault_path, cleaned))
+        vault_root = os.path.abspath(self.vault_path)
+        if os.path.commonpath([vault_root, abs_path]) != vault_root:
+            raise ValueError(f"目标路径越过知识库根目录: {relative_path}")
+        return abs_path
+
+    def sanitize_filename(self, name: str, suffix: str = ".md") -> str:
+        """生成适合 Windows/Obsidian 的文件名。"""
+        safe_name = re.sub(r'[\\/*?:"<>|]', '_', (name or "Untitled").strip()).strip(". ")
+        if not safe_name:
+            safe_name = "Untitled"
+        if suffix and not safe_name.lower().endswith(suffix.lower()):
+            safe_name += suffix
+        return safe_name
+
+    def resolve_note_path(self, requested_path: str, fallback_concept: str) -> str:
+        """解析 LLM 或用户给出的目标笔记路径，空值则按概念名写入根目录。"""
+        if requested_path:
+            requested_path = requested_path.strip()
+            if requested_path.lower().endswith(".md"):
+                target_path = self._safe_join_vault(requested_path)
+            else:
+                target_path = self._safe_join_vault(os.path.join(requested_path, self.sanitize_filename(fallback_concept)))
+            return target_path
+        return os.path.join(self.vault_path, self.sanitize_filename(fallback_concept))
+
+    def get_relative_path(self, file_path: str) -> str:
+        """返回相对 vault 的路径，方便给 LLM 和 UI 展示。"""
+        return os.path.relpath(file_path, self.vault_path).replace("\\", "/")
+
+    def get_vault_structure_summary(self, max_items: int = 120) -> str:
+        """生成轻量目录树摘要，供 LLM 判断笔记应放在哪。"""
+        if not os.path.exists(self.vault_path):
+            return "(vault is empty)"
+
+        lines = []
+        count = 0
+        for root, dirs, files in os.walk(self.vault_path):
+            dirs[:] = sorted([d for d in dirs if not d.startswith(".")])
+            md_files = sorted([f for f in files if f.endswith(".md")])
+            depth = max(0, len(os.path.relpath(root, self.vault_path).split(os.sep)) - 1)
+            if root == self.vault_path:
+                lines.append("/")
+            else:
+                lines.append(f"{'  ' * depth}- {os.path.basename(root)}/")
+            count += 1
+            for file_name in md_files:
+                if file_name == self.ORGANIZATION_RULES_FILENAME:
+                    continue
+                lines.append(f"{'  ' * (depth + 1)}- {file_name}")
+                count += 1
+                if count >= max_items:
+                    lines.append("  ...")
+                    return "\n".join(lines)
+        return "\n".join(lines) if lines else "(vault is empty)"
+
+    def get_organization_rules_path(self) -> str:
+        return os.path.join(self.vault_path, self.ORGANIZATION_RULES_FILENAME)
+
+    def ensure_organization_rules(self) -> str:
+        """创建并返回知识库整理规则文件。"""
+        path = self.get_organization_rules_path()
+        if not os.path.exists(path):
+            os.makedirs(self.vault_path, exist_ok=True)
+            default_rules = """# Crucible Organization Rules
+
+## Folder Strategy
+- `Sources/` stores source-oriented notes for imported videos, audio, PDFs, and web links.
+- `Concepts/` stores atomic concept notes.
+- `People/` stores people and organization notes.
+- `Projects/` stores project-specific working notes.
+- `Media/` stores notes that are tightly coupled to video scenes, timestamps, or visual analysis.
+
+## Naming
+- Use concise Chinese or English concept names.
+- Keep Markdown files portable and Obsidian-compatible.
+- Prefer stable topic folders over one-off deep nesting.
+
+## LLM Filing Rules
+- If a note is about a reusable idea, place it under `Concepts/`.
+- If a note mostly summarizes a specific video or document, place it under `Sources/`.
+- Preserve user-written notes and frontmatter.
+- Never move or delete files unless the user explicitly requests reorganization.
+"""
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(default_rules)
+        return path
+
+    def read_organization_rules(self) -> str:
+        path = self.ensure_organization_rules()
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
 
     def _parse_frontmatter_aliases(self, file_path: str) -> List[str]:
         """解析 markdown 头部 frontmatter 中的别名或标签"""
@@ -93,8 +192,44 @@ class FSRouter:
             return existing_path
         
         # 安全化文件名，移除非法字符
-        safe_concept = re.sub(r'[\\/*?:"<>|]', '_', concept).strip()
-        return os.path.join(self.vault_path, f"{safe_concept}.md")
+        return os.path.join(self.vault_path, self.sanitize_filename(concept))
+
+    def create_folder(self, parent_path: str, folder_name: str) -> str:
+        safe_name = self.sanitize_filename(folder_name, suffix="")
+        base = parent_path if parent_path and os.path.isdir(parent_path) else self.vault_path
+        target = self._safe_join_vault(os.path.join(self.get_relative_path(base), safe_name))
+        os.makedirs(target, exist_ok=True)
+        return target
+
+    def create_note(self, parent_path: str, note_name: str, content: str = "") -> str:
+        safe_name = self.sanitize_filename(note_name)
+        base = parent_path if parent_path and os.path.isdir(parent_path) else self.vault_path
+        target = self._safe_join_vault(os.path.join(self.get_relative_path(base), safe_name))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if not os.path.exists(target):
+            with open(target, "w", encoding="utf-8") as f:
+                f.write(content)
+        return target
+
+    def rename_path(self, path: str, new_name: str) -> str:
+        if not path or not os.path.exists(path):
+            raise FileNotFoundError(f"路径不存在: {path}")
+        suffix = "" if os.path.isdir(path) else os.path.splitext(path)[1]
+        safe_name = self.sanitize_filename(new_name, suffix=suffix)
+        target = self._safe_join_vault(os.path.join(self.get_relative_path(os.path.dirname(path)), safe_name))
+        os.replace(path, target)
+        self.scan_vault()
+        return target
+
+    def move_path(self, path: str, target_dir: str) -> str:
+        if not path or not os.path.exists(path):
+            raise FileNotFoundError(f"路径不存在: {path}")
+        if not target_dir or not os.path.isdir(target_dir):
+            raise NotADirectoryError(f"目标目录不存在: {target_dir}")
+        target = self._safe_join_vault(os.path.join(self.get_relative_path(target_dir), os.path.basename(path)))
+        os.replace(path, target)
+        self.scan_vault()
+        return target
 
     def get_vault_tree_nodes(self) -> List[Dict]:
         """

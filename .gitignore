@@ -5,6 +5,7 @@ app.log
 # 忽略本地 SQLite 数据库
 *.db
 data/crucible.db
+data/local_settings.json
 
 # 忽略 Python 缓存
 __pycache__/

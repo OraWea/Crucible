@@ -39,11 +39,52 @@ class DBManager:
                         token_cost INTEGER
                     )
                 """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS sources (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source_name TEXT NOT NULL,
+                        source_type TEXT NOT NULL,
+                        source_uri TEXT NOT NULL,
+                        source_hash TEXT NOT NULL UNIQUE,
+                        duration REAL,
+                        source_note_path TEXT NOT NULL,
+                        asr_engine TEXT,
+                        vlm_model TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS segments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source_id INTEGER NOT NULL,
+                        start_time REAL NOT NULL,
+                        end_time REAL NOT NULL,
+                        text TEXT NOT NULL,
+                        timestamp_label TEXT NOT NULL,
+                        sort_order INTEGER NOT NULL,
+                        FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS concept_mentions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        source_id INTEGER NOT NULL,
+                        concept_name TEXT NOT NULL,
+                        segment_id INTEGER,
+                        timestamp_label TEXT NOT NULL,
+                        source_note_path TEXT NOT NULL,
+                        FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE,
+                        FOREIGN KEY(segment_id) REFERENCES segments(id) ON DELETE SET NULL
+                    )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_segments_text ON segments(text)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_concept_mentions_name ON concept_mentions(concept_name)")
                 conn.commit()
             logger.info("SQLite 数据库初始化成功。")
         except Exception as e:
             logger.error(f"SQLite 初始化失败: {e}", exc_info=True)
-            raise e
+            raise
 
     def add_log(self, level: str, module: str, action: str, detail: str = None, 
                 duration: float = None, token_cost: int = None):

@@ -1,48 +1,37 @@
 import os
 import logging
-import json
 import time
-import requests
 import datetime
-from typing import Dict, Any, List, Tuple
-from Crucible.config import Config
+from typing import Dict, Any, List
 from Crucible.utils.db_manager import db_manager
 from Crucible.utils.fs_router import fs_router
 from Crucible.utils.wiki_editor import wiki_editor
+from Crucible.models.api_client import llm_client, parse_json_response, strip_code_fence
 
 logger = logging.getLogger(__name__)
 
 class LLMCore:
     def __init__(self):
-        self.api_key = Config.LLM_API_KEY
-        self.api_base = Config.LLM_API_BASE
-        self.model_name = Config.LLM_MODEL_NAME
+        self.client = llm_client
+
+    @property
+    def api_key(self) -> str:
+        return self.client.api_key
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        self.client.configure(api_key=value)
 
     def _call_api(self, prompt: str, system_prompt: str = "你是一个智能的个人第二大脑知识库助手。") -> str:
         """底层封装的 API 调用接口"""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": self.model_name,
-            "messages": [
+        return self.client.chat(
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.2
-        }
-        
-        try:
-            response = requests.post(f"{self.api_base}/chat/completions", json=payload, headers=headers, timeout=60)
-            if response.status_code != 200:
-                raise RuntimeError(f"LLM API 响应错误 ({response.status_code}): {response.text}")
-            
-            resp_json = response.json()
-            return resp_json['choices'][0]['message']['content'].strip()
-        except Exception as e:
-            logger.error(f"调用 LLM 接口失败: {e}", exc_info=True)
-            raise e
+            temperature=0.2,
+            timeout=60,
+        )
 
     def extract_concepts(self, raw_input_text: str) -> List[Dict[str, Any]]:
         """
@@ -57,10 +46,21 @@ class LLMCore:
         start_time = time.time()
         
         system_prompt = "你是一个专业的知识图谱抽取专家。你擅长从各种类型的文本、音频转录和图像描述中识别出核心主题和知识概念。"
+        vault_structure = fs_router.get_vault_structure_summary()
+        organization_rules = fs_router.read_organization_rules()
         
         prompt = f"""请分析以下非结构化文本，提取出其中讨论的所有核心主题、概念、人物、专有名词或关键知识点。
 内容可能涉及学术、技术、游戏、生活、娱乐、文化等任何领域，请尽量全面地提取。
 对于每个关键概念，必须提取出其详细释义、包含的要点（Key Points），以及涉及的任何代码块或公式（如无则留空）。
+你还需要根据当前 Obsidian 知识库目录结构与整理规则，为每个概念建议一个相对 vault 根目录的 Markdown 写入路径 `target_path`。
+
+当前知识库结构：
+{vault_structure}
+
+知识库整理规则：
+\"\"\"
+{organization_rules}
+\"\"\"
 
 输入文本：
 \"\"\"
@@ -73,7 +73,8 @@ class LLMCore:
     "concept": "概念/名词名称（必须简短、精准，例如 'Transformer' 或 '后撤步'）",
     "definition": "对该概念在文中的详细中文定义与解释",
     "key_points": ["核心要点1", "核心要点2", "核心要点3"],
-    "code_or_formula": "提取的相关代码块或公式（若无则填空字符串）"
+    "code_or_formula": "提取的相关代码块或公式（若无则填空字符串）",
+    "target_path": "建议写入的 Markdown 相对路径，例如 Concepts/Transformer.md 或 Sources/视频标题.md"
   }}
 ]
 
@@ -83,15 +84,9 @@ class LLMCore:
         try:
             raw_response = self._call_api(prompt, system_prompt)
             
-            # 清理可能被模型误添加的 ```json 代码块包裹
-            cleaned_response = raw_response.strip()
-            if cleaned_response.startswith("```"):
-                lines = cleaned_response.split("\n")
-                if lines[0].startswith("```json") or lines[0].startswith("```"):
-                    lines = lines[1:-1]
-                cleaned_response = "\n".join(lines).strip()
-            
-            concepts = json.loads(cleaned_response)
+            concepts = parse_json_response(raw_response)
+            if not isinstance(concepts, list):
+                raise ValueError("概念抽取结果必须是 JSON 数组")
             
             duration = time.time() - start_time
             logger.info(f"概念提取完成，共识别出 {len(concepts)} 个核心概念，用时 {duration:.2f}s")
@@ -102,7 +97,7 @@ class LLMCore:
         except Exception as e:
             logger.error(f"解析概念 JSON 失败，模型原始输出为:\n{raw_response}")
             db_manager.add_log("ERROR", "LLM", "Extract_Failure", f"JSON解析错误: {e}")
-            raise e
+            raise
 
     def merge_and_write_wiki(self, concept_data: Dict[str, Any], source_filename: str) -> str:
         """
@@ -120,7 +115,8 @@ class LLMCore:
         logger.info(f"开始执行 [阶段二: 智能合并笔记] -> 概念: {concept_name}")
         
         # 1. 定位本地文件系统中的路径
-        file_path = fs_router.get_concept_write_path(concept_name)
+        target_path = concept_data.get("target_path", "")
+        file_path = fs_router.locate_concept_file(concept_name) or fs_router.resolve_note_path(target_path, concept_name)
         old_content = ""
         
         if os.path.exists(file_path):
@@ -158,6 +154,7 @@ class LLMCore:
 concept: {concept_name}
 updated_at: "{timestamp}"
 source: "{source_filename}"
+target_path: "{fs_router.get_relative_path(file_path)}"
 tags: [knowledge-node, auto-updated]
 ---
 
@@ -167,13 +164,7 @@ tags: [knowledge-node, auto-updated]
             start_time = time.time()
             merged_content = self._call_api(prompt, system_prompt)
             
-            # 清理可能的 markdown 代码块标记
-            merged_content = merged_content.strip()
-            if merged_content.startswith("```"):
-                lines = merged_content.split("\n")
-                if lines[0].startswith("```markdown") or lines[0].startswith("```"):
-                    lines = lines[1:-1]
-                merged_content = "\n".join(lines).strip()
+            merged_content = strip_code_fence(merged_content, "markdown")
 
             # 3. 原子化安全覆写本地磁盘
             success = wiki_editor.write_wiki_atomic(file_path, merged_content)
@@ -192,7 +183,7 @@ tags: [knowledge-node, auto-updated]
         except Exception as e:
             logger.error(f"合并笔记失败: {concept_name}, {e}")
             db_manager.add_log("ERROR", "LLM", "Wiki_Weave_Failure", f"合并失败: {concept_name}, {e}")
-            raise e
+            raise
 
 # 实例化单例
 llm_core = LLMCore()

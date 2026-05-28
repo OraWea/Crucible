@@ -4,13 +4,13 @@ import logging
 import torch
 import base64
 import time
-import requests
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from PIL import Image
 import numpy as np
 from Crucible.config import Config
 from Crucible.utils.video_processor import video_processor
 from Crucible.utils.db_manager import db_manager
+from Crucible.models.api_client import llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +22,20 @@ class VLMAnalyzer:
         self.processor = None
         
         # 尝试初始化本地模型，若硬件不支持或失败，则自动启用 API 模式
-        self.use_api = True
-        if Config.LLM_API_KEY == 'your-api-key' or not Config.LLM_API_KEY:
-            self.use_api = False
+        self.use_api = Config.has_valid_api_key()
             
         if not self.use_api:
             self._init_local_model()
+
+    @property
+    def api_key(self) -> str:
+        return llm_client.api_key
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        llm_client.configure(api_key=value)
+        if Config.has_valid_api_key(value):
+            self.use_api = True
 
     def _init_local_model(self):
         """加载本地 Qwen-VL 视觉大模型"""
@@ -97,25 +105,21 @@ class VLMAnalyzer:
 
     def _analyze_frame_api(self, frame: np.ndarray) -> tuple:
         """使用 OpenAI 兼容的多模态 API 接口进行在线推理"""
+        if not Config.has_valid_api_key():
+            raise RuntimeError("未配置有效 API Key，无法使用 VLM API。")
+
         # 将 opencv 的 RGB 帧转为 jpg 二进制数据并做 base64 编码
         _, buffer = cv2.imencode('.jpg', cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         base64_image = base64.b64encode(buffer).decode('utf-8')
         
         # 针对阿里云 DashScope qwen-vl-max/plus 进行模型名称适配，
         # 如果用户配了别的平台，可自行在 .env 中覆盖
-        model_name = Config.LLM_MODEL_NAME
+        model_name = Config.VLM_MODEL_NAME
         if "dashscope" in Config.LLM_API_BASE:
-            model_name = "qwen-vl-plus" # 默认选用 Qwen-VL 专业版 API
+            model_name = "qwen-vl-plus"  # 默认选用 Qwen-VL 专业版 API
             
-        headers = {
-            "Authorization": f"Bearer {Config.LLM_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        # 多模态 payload
-        payload = {
-            "model": model_name,
-            "messages": [
+        content = llm_client.chat(
+            [
                 {
                     "role": "user",
                     "content": [
@@ -135,16 +139,10 @@ class VLMAnalyzer:
                     ]
                 }
             ],
-            "temperature": 0.1
-        }
-        
-        response = requests.post(Config.LLM_API_BASE + "/chat/completions", json=payload, headers=headers, timeout=30)
-        
-        if response.status_code != 200:
-            raise RuntimeError(f"VLM API 请求失败 ({response.status_code}): {response.text}")
-            
-        resp_json = response.json()
-        content = resp_json['choices'][0]['message']['content'].strip()
+            model_name=model_name,
+            temperature=0.1,
+            timeout=30,
+        )
         
         return self._parse_vlm_output(content)
 
