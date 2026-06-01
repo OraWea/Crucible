@@ -11,3 +11,6 @@ python-dotenv
 requests
 Pillow
 dashscope
+fastapi
+uvicorn[standard]
+python-multipart

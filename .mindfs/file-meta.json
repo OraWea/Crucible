@@ -1,0 +1,98 @@
+{
+  "README.md": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-30T01:26:09.5465015Z",
+      "updated_at": "2026-05-30T01:26:09.5731876Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/__init__.py": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T13:08:10.7468463Z",
+      "updated_at": "2026-05-29T13:08:10.7468463Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/app.py": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T13:08:10.7291793Z",
+      "updated_at": "2026-05-29T13:12:21.0317884Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/.gitignore": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:24:44.8080735Z",
+      "updated_at": "2026-05-29T12:24:44.822717Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/index.html": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4392754Z",
+      "updated_at": "2026-05-29T12:20:00.4392754Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/package.json": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4539344Z",
+      "updated_at": "2026-05-29T12:26:39.5621626Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/src/main.tsx": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4676367Z",
+      "updated_at": "2026-05-29T13:23:54.1329808Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/src/styles.css": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4831031Z",
+      "updated_at": "2026-05-29T13:24:04.3410367Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/tsconfig.json": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4977439Z",
+      "updated_at": "2026-05-29T12:25:46.9312218Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/tsconfig.node.json": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.5126414Z",
+      "updated_at": "2026-05-29T12:25:12.4594596Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/vite.config.ts": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T12:20:00.4211074Z",
+      "updated_at": "2026-05-29T13:14:18.5064786Z",
+      "created_by": "agent"
+    }
+  ],
+  "requirements.txt": [
+    {
+      "source_session": "1780057061-3669e9e9bbe2",
+      "created_at": "2026-05-29T13:08:10.7668175Z",
+      "updated_at": "2026-05-29T13:08:10.8030139Z",
+      "created_by": "agent"
+    }
+  ]
+}
