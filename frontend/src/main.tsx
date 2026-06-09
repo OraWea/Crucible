@@ -57,6 +57,7 @@ import {
   formatDuration,
   normalizeUrlInput,
   parentPathOf,
+  previewCacheKey,
   sourceKind
 } from "./utils";
 
@@ -133,6 +134,19 @@ function App() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const previousJobStatusesRef = useRef<Record<string, ProcessJob["status"]>>({});
+  const previewCacheRef = useRef<Map<string, string>>(new Map());
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const previewRequestKeyRef = useRef("");
+
+  const rememberPreview = useCallback((path: string, content: string, html: string) => {
+    const cacheKey = previewCacheKey(path, content);
+    previewCacheRef.current.set(cacheKey, html);
+    while (previewCacheRef.current.size > 24) {
+      const oldest = previewCacheRef.current.keys().next().value;
+      if (oldest === undefined) break;
+      previewCacheRef.current.delete(oldest);
+    }
+  }, []);
 
   const api = useCallback(async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
     const headers = new Headers(options.headers);
@@ -175,6 +189,7 @@ function App() {
       setNote(loaded);
       setEditorContent(loaded.content);
       setPreviewHtml(loaded.preview_html);
+      rememberPreview(loaded.path, loaded.content, loaded.preview_html);
       setActiveAnchor(anchor);
       setNewItemParent(parentPathOf(loaded.path));
       if (anchor) setEditorMode("preview");
@@ -183,7 +198,7 @@ function App() {
     } catch (error) {
       showError(error);
     }
-  }, [api, showError]);
+  }, [api, rememberPreview, showError]);
 
   const refreshVault = useCallback(async () => {
     const data = await api<{ nodes: VaultNode[] }>("/api/vault/tree");
@@ -306,6 +321,10 @@ function App() {
     setLogs([]);
     setTrashItems([]);
     setSettingsStatus(null);
+    previewCacheRef.current.clear();
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
+    previewRequestKeyRef.current = "";
   };
 
   const logout = async () => {
@@ -416,21 +435,53 @@ function App() {
   useEffect(() => {
     if (!user || !note) {
       setPreviewHtml("");
+      previewAbortRef.current?.abort();
+      previewAbortRef.current = null;
+      previewRequestKeyRef.current = "";
       return;
     }
 
+    const cacheKey = previewCacheKey(note.path, editorContent);
+    const cachedPreview = previewCacheRef.current.get(cacheKey);
+    if (cachedPreview !== undefined) {
+      setPreviewHtml(cachedPreview);
+      setPreviewPending(false);
+      return;
+    }
+    if (previewRequestKeyRef.current === cacheKey) return;
+
     let cancelled = false;
     const id = window.setTimeout(() => {
+      previewAbortRef.current?.abort();
+      const controller = new AbortController();
+      previewAbortRef.current = controller;
+      previewRequestKeyRef.current = cacheKey;
       setPreviewPending(true);
       api<{ preview_html: string }>("/api/notes/preview", {
         method: "POST",
-        body: JSON.stringify({ content: editorContent })
+        body: JSON.stringify({ content: editorContent }),
+        signal: controller.signal
       })
         .then((data) => {
-          if (!cancelled) setPreviewHtml(data.preview_html);
+          if (cancelled) return;
+          previewCacheRef.current.set(cacheKey, data.preview_html);
+          while (previewCacheRef.current.size > 24) {
+            const oldest = previewCacheRef.current.keys().next().value;
+            if (oldest === undefined) break;
+            previewCacheRef.current.delete(oldest);
+          }
+          setPreviewHtml(data.preview_html);
         })
-        .catch(() => undefined)
+        .catch((error) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+        })
         .finally(() => {
+          if (previewAbortRef.current === controller) {
+            previewAbortRef.current = null;
+          }
+          if (previewRequestKeyRef.current === cacheKey) {
+            previewRequestKeyRef.current = "";
+          }
           if (!cancelled) setPreviewPending(false);
         });
     }, 250);
@@ -438,6 +489,7 @@ function App() {
     return () => {
       cancelled = true;
       window.clearTimeout(id);
+      previewAbortRef.current?.abort();
     };
   }, [api, editorContent, note?.path, user]);
 
@@ -512,6 +564,7 @@ function App() {
       setNote(saved);
       setEditorContent(saved.content);
       setPreviewHtml(saved.preview_html);
+      rememberPreview(saved.path, saved.content, saved.preview_html);
       setDirty(false);
       setMessage("笔记已保存");
       await Promise.all([refreshVault(), refreshGraph()]);
@@ -531,6 +584,7 @@ function App() {
       setNote(created);
       setEditorContent(created.content);
       setPreviewHtml(created.preview_html);
+      rememberPreview(created.path, created.content, created.preview_html);
       setEditorMode("edit");
       setActiveAnchor("");
       setNewItemParent(parentPathOf(created.path));
@@ -579,6 +633,7 @@ function App() {
       setNote(rules);
       setEditorContent(rules.content);
       setPreviewHtml(rules.preview_html);
+      rememberPreview(rules.path, rules.content, rules.preview_html);
       setEditorMode("edit");
       setActiveAnchor("");
       setNewItemParent(parentPathOf(rules.path));
@@ -597,6 +652,7 @@ function App() {
       setNote(loaded);
       setEditorContent(loaded.content);
       setPreviewHtml(loaded.preview_html);
+      rememberPreview(loaded.path, loaded.content, loaded.preview_html);
       setActiveAnchor(loaded.anchor || "");
       setNewItemParent(parentPathOf(loaded.path));
       if (loaded.anchor) setEditorMode("preview");

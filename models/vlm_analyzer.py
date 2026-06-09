@@ -22,7 +22,7 @@ class VLMAnalyzer:
         self.processor = None
         
         # 尝试初始化本地模型，若硬件不支持或失败，则自动启用 API 模式
-        self.use_api = Config.has_valid_api_key()
+        self.use_api = Config.has_valid_api_key(provider=Config.LLM_PROVIDER)
             
         if not self.use_api:
             self._init_local_model()
@@ -34,7 +34,7 @@ class VLMAnalyzer:
     @api_key.setter
     def api_key(self, value: str) -> None:
         llm_client.configure(api_key=value)
-        if Config.has_valid_api_key(value):
+        if Config.has_valid_api_key(value, provider=Config.LLM_PROVIDER):
             self.use_api = True
 
     def _init_local_model(self):
@@ -54,9 +54,15 @@ class VLMAnalyzer:
             logger.info("本地 VLM 模型加载成功。")
             db_manager.add_log("INFO", "VLM", "Model_Load_Success", "成功加载本地 VLM 模型")
         except Exception as e:
-            logger.warning(f"本地 VLM 加载失败 ({e})，系统将自动降级为 API 模式运行。")
-            db_manager.add_log("WARNING", "VLM", "Model_Load_Downgrade", f"本地加载失败 ({e})，降级为 API 模式")
-            self.use_api = True
+            safe_error = Config.redact_secrets(str(e))
+            if Config.has_valid_api_key(provider=Config.LLM_PROVIDER):
+                logger.warning(f"本地 VLM 加载失败 ({safe_error})，系统将自动降级为 API 模式运行。")
+                db_manager.add_log("WARNING", "VLM", "Model_Load_Downgrade", f"本地加载失败 ({safe_error})，降级为 API 模式")
+                self.use_api = True
+            else:
+                logger.warning(f"本地 VLM 加载失败 ({safe_error})，且未配置有效 API Key，跳过视觉分析。")
+                db_manager.add_log("WARNING", "VLM", "Model_Load_Unavailable", f"本地加载失败 ({safe_error})，无可用 API，跳过视觉分析")
+                self.use_api = False
 
     def analyze_video(self, video_path: str, timestamps: List[float]) -> Dict[float, Dict[str, Any]]:
         """
@@ -71,6 +77,10 @@ class VLMAnalyzer:
         """
         results = {}
         if not os.path.exists(video_path):
+            return results
+        if not self.use_api and (self.local_model is None or self.processor is None):
+            logger.warning("VLM Provider 与本地模型均不可用，跳过关键帧视觉分析。")
+            db_manager.add_log("WARNING", "VLM", "Analyze_Downgrade", "VLM 不可用，跳过关键帧视觉分析")
             return results
 
         logger.info(f"开始分析视频关键帧 (共 {len(timestamps)} 个时间点)...")
@@ -105,7 +115,7 @@ class VLMAnalyzer:
 
     def _analyze_frame_api(self, frame: np.ndarray) -> tuple:
         """使用 OpenAI 兼容的多模态 API 接口进行在线推理"""
-        if not Config.has_valid_api_key():
+        if not Config.has_valid_api_key(provider=Config.LLM_PROVIDER):
             raise RuntimeError("未配置有效 API Key，无法使用 VLM API。")
 
         # 将 opencv 的 RGB 帧转为 jpg 二进制数据并做 base64 编码

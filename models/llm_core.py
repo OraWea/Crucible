@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 from Crucible.utils.db_manager import db_manager
 from Crucible.utils.fs_router import fs_router
 from Crucible.utils.wiki_editor import wiki_editor
-from Crucible.models.api_client import llm_client, parse_json_response, strip_code_fence
+from Crucible.models.api_client import ProviderUnavailableError, llm_client, parse_json_response, strip_code_fence
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,10 @@ class LLMCore:
             
             return concepts
             
+        except ProviderUnavailableError as e:
+            logger.warning("LLM Provider 不可用，概念抽取降级为空结果: %s", e)
+            db_manager.add_log("WARNING", "LLM", "Extract_Downgrade", "Provider 不可用，返回空概念列表")
+            return []
         except Exception as e:
             logger.error(f"解析概念 JSON 失败，模型原始输出为:\n{raw_response}")
             db_manager.add_log("ERROR", "LLM", "Extract_Failure", f"JSON解析错误: {e}")
@@ -180,10 +184,66 @@ tags: [knowledge-node, auto-updated]
             else:
                 raise IOError(f"原子覆写本地文件失败: {file_path}")
                 
+        except ProviderUnavailableError as e:
+            logger.warning("LLM Provider 不可用，使用保守模板写入概念笔记: %s", e)
+            fallback_content = self._build_fallback_concept_note(
+                concept_name=concept_name,
+                definition=definition,
+                key_points=concept_data.get("key_points", []),
+                code_or_formula=code_or_formula,
+                source_filename=source_filename,
+                file_path=file_path,
+                timestamp=timestamp,
+            )
+            success = wiki_editor.write_wiki_atomic(file_path, fallback_content)
+            if not success:
+                raise IOError(f"原子覆写本地文件失败: {file_path}") from e
+            fs_router.scan_vault()
+            db_manager.add_log("WARNING", "LLM", "Wiki_Weave_Downgrade", f"Provider 不可用，已写入保守模板: {concept_name}")
+            return fallback_content
         except Exception as e:
             logger.error(f"合并笔记失败: {concept_name}, {e}")
             db_manager.add_log("ERROR", "LLM", "Wiki_Weave_Failure", f"合并失败: {concept_name}, {e}")
             raise
+
+    def _build_fallback_concept_note(
+        self,
+        *,
+        concept_name: str,
+        definition: str,
+        key_points: List[str],
+        code_or_formula: str,
+        source_filename: str,
+        file_path: str,
+        timestamp: str,
+    ) -> str:
+        """Provider 不可用时生成可追溯、可编辑的保守概念页。"""
+        points = "\n".join(f"- {item}" for item in key_points if item) or "- 待补充"
+        code_block = ""
+        if code_or_formula:
+            code_block = f"\n## 代码或公式\n\n{code_or_formula.strip()}\n"
+        return f"""---
+concept: {concept_name}
+updated_at: "{timestamp}"
+source: "{source_filename}"
+target_path: "{fs_router.get_relative_path(file_path)}"
+tags: [knowledge-node, fallback-generated]
+---
+
+# {concept_name}
+
+## 定义
+
+{definition or "待补充"}
+
+## 要点
+
+{points}
+{code_block}
+## 来源
+
+- [[{source_filename}]]
+"""
 
 # 实例化单例
 llm_core = LLMCore()

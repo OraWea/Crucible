@@ -1348,6 +1348,10 @@ class MainWindow(QMainWindow):
 
     def start_ai_flow(self):
         """启动后台 ASR + VLM + LLM 推理异步子线程"""
+        if self.active_worker and self.active_worker.isRunning():
+            QMessageBox.information(self, "任务进行中", "当前 AI 处理任务尚未完成，请等待结束后再启动新任务。")
+            return
+
         # 如果 URL 输入框中存有内容，自动触发添加动作
         if self.txt_url_input.text().strip():
             if not self.add_url_manually():
@@ -1380,7 +1384,7 @@ class MainWindow(QMainWindow):
         
         # 实例化后台线程，开始异步执行
         self.active_worker = AIWorker(
-            file_paths=self.selected_files,
+            file_paths=list(self.selected_files),
             whisper_lang=whisper_lang,
             custom_api_key=custom_key if custom_key else None,
             asr_engine=asr_engine,
@@ -1407,6 +1411,7 @@ class MainWindow(QMainWindow):
     def on_worker_finished(self, success: bool, msg: str):
         """线程完毕回调"""
         self.btn_weave.setEnabled(True)
+        self.active_worker = None
         self.selected_files.clear()
         self.lbl_selected.setText("未选择任何文件")
         

@@ -145,33 +145,51 @@ class SourceIndex:
     def write_source_note(self, source: Dict, segments: List[Dict], concepts: List[Dict]) -> str:
         source_note_abs_path = os.path.join(Config.OBSIDIAN_VAULT_PATH, source["source_note_path"].replace("/", os.sep))
         os.makedirs(os.path.dirname(source_note_abs_path), exist_ok=True)
+        content = self._build_source_note_content(source, segments, concepts)
+        wiki_editor.write_wiki_atomic(source_note_abs_path, content)
+        return source_note_abs_path
+
+    def _build_source_note_content(self, source: Dict, segments: List[Dict], concepts: List[Dict]) -> str:
         concept_links = [f"[[{item['concept']}]]" for item in concepts if item.get("concept")]
         metadata = self._json_field(source.get("metadata_json"), {})
         keyframes = self._json_field(source.get("keyframes_json"), [])
+        source_name = source.get("source_name") or "Untitled Source"
+        source_type = source.get("source_type") or "unknown"
+        source_uri = source.get("source_uri") or ""
+        source_hash = source.get("source_hash") or ""
+        source_note_path = source.get("source_note_path") or self._source_note_path(source_name)
+        timestamp_links = [
+            source_timestamp_link(source_note_path, float(segment.get("start") or 0.0))
+            for segment in segments
+            if (segment.get("text") or "").strip()
+        ]
 
         lines = [
             "---",
-            f"source_name: \"{source['source_name']}\"",
-            f"source_type: \"{source['source_type']}\"",
-            f"source_uri: \"{source['source_uri']}\"",
-            f"source_hash: \"{source['source_hash']}\"",
+            f"source_name: \"{source_name}\"",
+            f"source_type: \"{source_type}\"",
+            f"source_uri: \"{source_uri}\"",
+            f"source_hash: \"{source_hash}\"",
             f"duration: {source.get('duration') or 0}",
             f"asr_engine: \"{source.get('asr_engine') or ''}\"",
             f"vlm_model: \"{source.get('vlm_model') or ''}\"",
+            f"source_timestamps: {self._yaml_string_list(timestamp_links)}",
+            f"concepts: {self._yaml_string_list([item['concept'] for item in concepts if item.get('concept')])}",
             "tags: [source-note, crucible]",
             "---",
             "",
-            f"# {source['source_name']}",
+            f"# {source_name}",
             "",
             "## 元数据",
             "",
-            f"- 来源路径: `{source['source_uri']}`",
-            f"- 文件 Hash: `{source['source_hash']}`",
+            f"- 来源路径: `{source_uri}`",
+            f"- 文件 Hash: `{source_hash}`",
             f"- 时长: {format_timestamp(float(source.get('duration') or 0.0))}",
             f"- 分辨率: {metadata.get('resolution') or '未知'}",
             f"- FPS: {metadata.get('fps') or '未知'}",
             f"- 音轨: {metadata.get('audio_streams') or '未知'}",
             f"- 字幕: {metadata.get('subtitle_streams') or '未知'}",
+            f"- 时间戳片段数: {len(timestamp_links)}",
             "",
             "## 关联概念",
             ", ".join(concept_links) if concept_links else "暂无",
@@ -202,15 +220,17 @@ class SourceIndex:
 
         for segment in segments:
             label = format_timestamp(float(segment.get("start") or 0.0))
+            link = source_timestamp_link(source_note_path, float(segment.get("start") or 0.0))
             lines.extend([
                 "",
                 f"### {label}",
                 "",
+                f"- 时间戳链接: {link}",
+                "",
                 segment.get("text", "").strip(),
             ])
 
-        wiki_editor.write_wiki_atomic(source_note_abs_path, "\n".join(lines).rstrip() + "\n")
-        return source_note_abs_path
+        return "\n".join(lines).rstrip() + "\n"
 
     def get_source_detail(self, source_id: int) -> Optional[Dict]:
         with db_manager.get_connection() as conn:
@@ -388,6 +408,13 @@ class SourceIndex:
             return json.loads(raw or "")
         except Exception:
             return fallback
+
+    def _yaml_string_list(self, values: List[str]) -> str:
+        escaped = []
+        for value in values:
+            text = str(value).replace("\\", "\\\\").replace('"', '\\"')
+            escaped.append(f'"{text}"')
+        return "[" + ", ".join(escaped) + "]"
 
     def _source_note_path(self, source_name: str) -> str:
         safe_name = fs_router.sanitize_filename(source_name)

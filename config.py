@@ -94,6 +94,7 @@ class Config:
             'vlm_model': VLM_MODEL_NAME,
         },
     }
+    LOCAL_PROVIDERS = {'ollama', 'lmstudio'}
     
     # 支持处理的文件格式
     SUPPORTED_VIDEO_FORMATS = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
@@ -106,12 +107,38 @@ class Config:
     TRASH_DIR = os.path.join(BACKUP_DIR, 'trash')
 
     @staticmethod
-    def has_valid_api_key(api_key: str = None) -> bool:
+    def is_local_provider(provider: str = None) -> bool:
+        """判断 Provider 是否为本地 OpenAI-compatible 服务。"""
+        return (provider or Config.LLM_PROVIDER) in Config.LOCAL_PROVIDERS
+
+    @staticmethod
+    def has_valid_api_key(api_key: str = None, provider: str = None) -> bool:
         """判断 API Key 是否可用于云端模型调用。"""
-        if Config.LLM_PROVIDER in ('ollama', 'lmstudio'):
+        if Config.is_local_provider(provider):
             return True
         value = api_key if api_key is not None else Config.LLM_API_KEY
         return bool(value and value.strip() and value.strip() != 'your-api-key')
+
+    @staticmethod
+    def mask_secret(value: str = None) -> str:
+        """脱敏展示 API Key 或其他敏感短文本。"""
+        if not value:
+            return ""
+        cleaned = str(value).strip()
+        if not cleaned:
+            return ""
+        if len(cleaned) <= 8:
+            return "***"
+        return f"{cleaned[:4]}...{cleaned[-4:]}"
+
+    @staticmethod
+    def redact_secrets(text: str) -> str:
+        """从日志/错误消息中移除当前运行期 API Key。"""
+        message = "" if text is None else str(text)
+        api_key = (Config.LLM_API_KEY or "").strip()
+        if api_key and api_key != "your-api-key":
+            message = message.replace(api_key, Config.mask_secret(api_key))
+        return message.replace("your-api-key", "<placeholder-api-key>")
 
     @staticmethod
     def init_paths():

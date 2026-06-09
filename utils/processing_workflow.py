@@ -153,7 +153,18 @@ class ProcessingWorkflow:
             "metadata": metadata,
             "keyframes": keyframes,
             "segments": segments,
-            "structured_source": self._prepend_source_metadata(source, source_name, structured_source, is_url),
+            "structured_source": self._prepend_source_metadata(
+                source=source,
+                source_name=source_name,
+                source_ext=source_ext,
+                source_type=source_type,
+                source_hash=source_hash,
+                duration=duration,
+                metadata=metadata,
+                segments=segments,
+                content=structured_source,
+                is_url=is_url,
+            ),
         }
 
     def _process_media_source(self, source: str, source_ext: str, is_url: bool, source_hash: str) -> tuple:
@@ -164,7 +175,7 @@ class ProcessingWorkflow:
         self.progress("第二步: ASR 转写语音文本中...", 40)
         transcriber = WhisperTranscriber(engine=self.options.asr_engine)
         segments = transcriber.transcribe(wav_path, language=self.options.whisper_lang)
-        full_source_text = "\n".join([f"[{seg['start']}-{seg['end']}s]: {seg['text']}" for seg in segments])
+        full_source_text = "\n".join(self._format_segment_line(seg) for seg in segments if seg.get("text"))
 
         structured_source = "【视频声音转写内容】:\n" + full_source_text + "\n\n"
         keyframes = []
@@ -233,16 +244,56 @@ class ProcessingWorkflow:
         total = max(0, int(seconds or 0))
         return f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
 
-    def _prepend_source_metadata(self, source: str, source_name: str, content: str, is_url: bool) -> str:
-        metadata = [
+    def _prepend_source_metadata(
+        self,
+        source: str,
+        source_name: str,
+        source_ext: str,
+        source_type: str,
+        source_hash: str,
+        duration: float,
+        metadata: Dict,
+        segments: List[Dict],
+        content: str,
+        is_url: bool,
+    ) -> str:
+        metadata_lines = [
             "【来源元数据】",
             f"source_name: {source_name}",
-            f"source_type: {'url' if is_url else 'file'}",
+            f"source_type: {source_type}",
+            f"source_ext: {source_ext or 'url'}",
             f"source: {source}",
+            f"source_hash_sha256: {source_hash}",
+            f"duration_seconds: {round(float(duration or 0.0), 2)}",
+            f"duration_label: {self._format_timestamp(duration)}",
+            f"is_url: {str(is_url).lower()}",
         ]
-        if not is_url and os.path.exists(source):
-            metadata.append(f"file_hash_sha256: {self._hash_file(source)}")
-        return "\n".join(metadata) + "\n\n" + content
+        if not is_url:
+            metadata_lines.append(f"file_size: {metadata.get('file_size', 0)}")
+
+        for key in ("resolution", "width", "height", "fps", "audio_streams", "subtitle_streams"):
+            value = metadata.get(key)
+            if value not in (None, ""):
+                metadata_lines.append(f"{key}: {value}")
+
+        segment_lines = [
+            "【来源时间戳片段】",
+        ]
+        for segment in segments:
+            text = (segment.get("text") or "").strip()
+            if not text:
+                continue
+            segment_lines.append(f"- {self._format_segment_line(segment)}")
+        if len(segment_lines) == 1:
+            segment_lines.append("- 暂无可用片段")
+
+        return "\n".join(metadata_lines) + "\n\n" + "\n".join(segment_lines) + "\n\n" + content
+
+    def _format_segment_line(self, segment: Dict) -> str:
+        text = (segment.get("text") or "").strip()
+        start = self._format_timestamp(segment.get("start"))
+        end = self._format_timestamp(segment.get("end"))
+        return f"{start} - {end}: {text}"
 
     def _source_hash(self, source: str, is_url: bool) -> str:
         if is_url:

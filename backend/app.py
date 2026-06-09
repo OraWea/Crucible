@@ -6,6 +6,7 @@ import secrets
 import sys
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
@@ -43,6 +44,19 @@ app.add_middleware(
 _sessions: Dict[str, Dict[str, str]] = {}
 _jobs: Dict[str, Dict[str, Any]] = {}
 _jobs_lock = threading.Lock()
+
+
+def _process_worker_count() -> int:
+    try:
+        return max(1, int(os.environ.get("CRUCIBLE_PROCESS_WORKERS", "2")))
+    except ValueError:
+        return 2
+
+
+_process_executor = ThreadPoolExecutor(
+    max_workers=_process_worker_count(),
+    thread_name_prefix="crucible-process",
+)
 
 
 class LoginRequest(BaseModel):
@@ -197,6 +211,13 @@ def _safe_vault_path(path: str = "") -> str:
 
 def _relative(file_path: str) -> str:
     return fs_router.get_relative_path(file_path)
+
+
+def _job_payload_snapshot(payload: BaseModel) -> Dict[str, Any]:
+    """返回可展示/可持久化的任务参数快照，避免泄露 API Key。"""
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    data["api_key"] = None
+    return data
 
 
 def _sync_path_reference(old_path: str, new_path: str, was_dir: bool) -> None:
@@ -577,7 +598,7 @@ def start_process(payload: ProcessRequest, user: Dict[str, str] = Depends(_curre
             "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "updated_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "user": user["username"],
-            "payload": payload.model_dump() if hasattr(payload, "model_dump") else payload.dict(),
+            "payload": _job_payload_snapshot(payload),
         }
 
     def progress(message: str, value: int) -> None:
@@ -591,6 +612,8 @@ def start_process(payload: ProcessRequest, user: Dict[str, str] = Depends(_curre
     def runner() -> None:
         try:
             from Crucible.utils.processing_workflow import ProcessingOptions, ProcessingWorkflow
+
+            progress("处理任务开始执行", 1)
 
             options = ProcessingOptions(
                 file_paths=payload.sources,
@@ -612,13 +635,14 @@ def start_process(payload: ProcessRequest, user: Dict[str, str] = Depends(_curre
             fs_router.scan_vault()
             db_manager.add_log("INFO", "Backend", "Process_Succeeded", f"job={job_id}")
         except Exception as exc:
+            safe_error = Config.redact_secrets(str(exc))
             with _jobs_lock:
                 _jobs[job_id]["status"] = "failed"
-                _jobs[job_id]["error"] = str(exc)
+                _jobs[job_id]["error"] = safe_error
                 _jobs[job_id]["updated_at"] = datetime.datetime.now().isoformat(timespec="seconds")
-            db_manager.add_log("ERROR", "Backend", "Process_Failed", f"job={job_id}, error={exc}")
+            db_manager.add_log("ERROR", "Backend", "Process_Failed", f"job={job_id}, error={safe_error}")
 
-    threading.Thread(target=runner, daemon=True).start()
+    _process_executor.submit(runner)
     return {"job_id": job_id}
 
 

@@ -4,6 +4,9 @@ import logging
 import datetime
 import tempfile
 import re
+import hashlib
+import threading
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 from markdown_it import MarkdownIt
@@ -12,9 +15,13 @@ from Crucible.config import Config
 logger = logging.getLogger(__name__)
 
 class WikiEditor:
+    PREVIEW_CACHE_LIMIT = 32
+
     def __init__(self, backup_dir: str = Config.BACKUP_DIR):
         self.backup_dir = backup_dir
         self.md_parser = MarkdownIt("commonmark", {"html": False})
+        self._preview_cache: OrderedDict[str, str] = OrderedDict()
+        self._preview_cache_lock = threading.RLock()
         os.makedirs(self.backup_dir, exist_ok=True)
 
     def read_wiki(self, file_path: str) -> str:
@@ -149,13 +156,40 @@ class WikiEditor:
 
     def render_markdown_preview(self, content: str) -> str:
         """将 Markdown 渲染为 HTML，并把 Obsidian 双链转换为可点击链接。"""
+        content = content or ""
+        cache_key = self._preview_cache_key(content)
+        cached = self._get_preview_cache(cache_key)
+        if cached is not None:
+            return cached
+
         def replace_link(match):
             item = self.extract_wiki_link_items(f"[[{match.group(1)}]]")[0]
             href = quote(item["raw"], safe="")
             return f"[{item['label']}](crucible://note/{href})"
 
-        normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, content or "")
-        return self._sanitize_rendered_html(self.md_parser.render(normalized))
+        normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, content)
+        rendered = self._sanitize_rendered_html(self.md_parser.render(normalized))
+        self._set_preview_cache(cache_key, rendered)
+        return rendered
+
+    def _preview_cache_key(self, content: str) -> str:
+        digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        return f"{len(content)}:{digest}"
+
+    def _get_preview_cache(self, key: str) -> Optional[str]:
+        with self._preview_cache_lock:
+            value = self._preview_cache.get(key)
+            if value is None:
+                return None
+            self._preview_cache.move_to_end(key)
+            return value
+
+    def _set_preview_cache(self, key: str, html: str) -> None:
+        with self._preview_cache_lock:
+            self._preview_cache[key] = html
+            self._preview_cache.move_to_end(key)
+            while len(self._preview_cache) > self.PREVIEW_CACHE_LIMIT:
+                self._preview_cache.popitem(last=False)
 
     def _sanitize_rendered_html(self, html: str) -> str:
         """限制 Markdown 链接协议，原生 HTML 已由 markdown-it 禁用。"""

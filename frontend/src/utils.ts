@@ -43,6 +43,14 @@ export function normalizeUrlInput(value: string) {
   return trimmed;
 }
 
+export function previewCacheKey(path: string, content: string) {
+  let hash = 0;
+  for (let index = 0; index < content.length; index += 1) {
+    hash = ((hash << 5) - hash + content.charCodeAt(index)) | 0;
+  }
+  return `${path}:${content.length}:${hash >>> 0}`;
+}
+
 export function findFirstNote(nodes: VaultNode[]): VaultNode | null {
   for (const node of nodes) {
     if (node.type === "file") return node;

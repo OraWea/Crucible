@@ -9,6 +9,10 @@ from Crucible.config import Config
 logger = logging.getLogger(__name__)
 
 
+class ProviderUnavailableError(RuntimeError):
+    """Provider 配置不可用或外部调用失败。"""
+
+
 def strip_code_fence(text: str, fence_hint: Optional[str] = None) -> str:
     """移除模型常见的 ```json / ```markdown 包裹。"""
     cleaned = (text or "").strip()
@@ -41,11 +45,13 @@ class OpenAICompatibleClient:
         api_key: Optional[str] = None,
         api_base: Optional[str] = None,
         model_name: Optional[str] = None,
+        provider: Optional[str] = None,
         timeout: int = 60,
     ):
         self.api_key = api_key or Config.LLM_API_KEY
         self.api_base = (api_base or Config.LLM_API_BASE).rstrip("/")
         self.model_name = model_name or Config.LLM_MODEL_NAME
+        self.provider = provider or Config.LLM_PROVIDER
         self.timeout = timeout
 
     def configure(
@@ -71,6 +77,8 @@ class OpenAICompatibleClient:
             self.api_base = api_base.rstrip("/")
         if model_name is not None:
             self.model_name = model_name
+        if provider is not None:
+            self.provider = provider
 
     def configure_from_provider(
         self,
@@ -103,6 +111,9 @@ class OpenAICompatibleClient:
         temperature: float = 0.2,
         timeout: Optional[int] = None,
     ) -> str:
+        if not Config.has_valid_api_key(self.api_key, provider=self.provider):
+            raise ProviderUnavailableError("未配置有效 API Key，已阻止云端模型调用。")
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -121,13 +132,17 @@ class OpenAICompatibleClient:
                 timeout=timeout or self.timeout,
             )
             if response.status_code != 200:
-                raise RuntimeError(f"API 响应错误 ({response.status_code}): {response.text}")
+                safe_body = Config.redact_secrets(response.text)
+                raise ProviderUnavailableError(f"API 响应错误 ({response.status_code}): {safe_body[:500]}")
 
             body = response.json()
             return body["choices"][0]["message"]["content"].strip()
-        except Exception:
-            logger.exception("调用 OpenAI-compatible 接口失败")
+        except ProviderUnavailableError:
+            logger.warning("OpenAI-compatible Provider 不可用: %s", Config.redact_secrets(self.api_base))
             raise
+        except Exception as exc:
+            logger.exception("调用 OpenAI-compatible 接口失败: %s", Config.redact_secrets(str(exc)))
+            raise ProviderUnavailableError(Config.redact_secrets(str(exc))) from exc
 
 
 llm_client = OpenAICompatibleClient()
