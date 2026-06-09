@@ -1,4 +1,5 @@
 import datetime
+import json
 import os
 import re
 from typing import Dict, List, Optional
@@ -35,6 +36,8 @@ class SourceIndex:
         duration: float = 0.0,
         asr_engine: str = "",
         vlm_model: str = "",
+        metadata: Optional[Dict] = None,
+        keyframes: Optional[List[Dict]] = None,
     ) -> Dict:
         source_note_path = self._source_note_path(source_name)
         source_note_rel_path = fs_router.get_relative_path(source_note_path)
@@ -46,9 +49,10 @@ class SourceIndex:
                 """
                 INSERT INTO sources (
                     source_name, source_type, source_uri, source_hash, duration,
-                    source_note_path, asr_engine, vlm_model, created_at, updated_at
+                    source_note_path, asr_engine, vlm_model, metadata_json,
+                    keyframes_json, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(source_hash) DO UPDATE SET
                     source_name=excluded.source_name,
                     source_type=excluded.source_type,
@@ -57,6 +61,8 @@ class SourceIndex:
                     source_note_path=excluded.source_note_path,
                     asr_engine=excluded.asr_engine,
                     vlm_model=excluded.vlm_model,
+                    metadata_json=excluded.metadata_json,
+                    keyframes_json=excluded.keyframes_json,
                     updated_at=excluded.updated_at
                 """,
                 (
@@ -68,6 +74,8 @@ class SourceIndex:
                     source_note_rel_path,
                     asr_engine,
                     vlm_model,
+                    json.dumps(metadata or {}, ensure_ascii=False),
+                    json.dumps(keyframes or [], ensure_ascii=False),
                     now,
                     now,
                 ),
@@ -138,6 +146,8 @@ class SourceIndex:
         source_note_abs_path = os.path.join(Config.OBSIDIAN_VAULT_PATH, source["source_note_path"].replace("/", os.sep))
         os.makedirs(os.path.dirname(source_note_abs_path), exist_ok=True)
         concept_links = [f"[[{item['concept']}]]" for item in concepts if item.get("concept")]
+        metadata = self._json_field(source.get("metadata_json"), {})
+        keyframes = self._json_field(source.get("keyframes_json"), [])
 
         lines = [
             "---",
@@ -153,11 +163,42 @@ class SourceIndex:
             "",
             f"# {source['source_name']}",
             "",
+            "## 元数据",
+            "",
+            f"- 来源路径: `{source['source_uri']}`",
+            f"- 文件 Hash: `{source['source_hash']}`",
+            f"- 时长: {format_timestamp(float(source.get('duration') or 0.0))}",
+            f"- 分辨率: {metadata.get('resolution') or '未知'}",
+            f"- FPS: {metadata.get('fps') or '未知'}",
+            f"- 音轨: {metadata.get('audio_streams') or '未知'}",
+            f"- 字幕: {metadata.get('subtitle_streams') or '未知'}",
+            "",
             "## 关联概念",
             ", ".join(concept_links) if concept_links else "暂无",
             "",
-            "## 时间轴",
+            "## 关键帧",
         ]
+
+        if keyframes:
+            for item in keyframes:
+                attachment = item.get("attachment_rel_path") or item.get("rel_path") or ""
+                timestamp_label = item.get("timestamp_label") or format_timestamp(float(item.get("timestamp") or 0.0))
+                lines.extend([
+                    "",
+                    f"### {timestamp_label}",
+                    "",
+                    f"![[{attachment}]]" if attachment else "",
+                    "",
+                    f"- OCR: {item.get('ocr') or '无'}",
+                    f"- 画面描述: {item.get('description') or '无'}",
+                ])
+        else:
+            lines.extend(["", "暂无关键帧。"])
+
+        lines.extend([
+            "",
+            "## 时间轴",
+        ])
 
         for segment in segments:
             label = format_timestamp(float(segment.get("start") or 0.0))
@@ -170,6 +211,68 @@ class SourceIndex:
 
         wiki_editor.write_wiki_atomic(source_note_abs_path, "\n".join(lines).rstrip() + "\n")
         return source_note_abs_path
+
+    def get_source_detail(self, source_id: int) -> Optional[Dict]:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM sources WHERE id = ?", (source_id,))
+            row = cursor.fetchone()
+        if not row:
+            return None
+        source = dict(row)
+        return {
+            "source": source,
+            "segments": self.get_segments(source_id),
+            "concept_mentions": self.get_mentions_for_source(source_id),
+            "metadata": self._json_field(source.get("metadata_json"), {}),
+            "keyframes": self._json_field(source.get("keyframes_json"), []),
+        }
+
+    def get_mentions_for_source(self, source_id: int) -> List[Dict]:
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM concept_mentions WHERE source_id = ? ORDER BY concept_name ASC, timestamp_label ASC",
+                (source_id,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_note_path_references(self, old_path: str, new_path: str) -> None:
+        old_path = (old_path or "").replace("\\", "/")
+        new_path = (new_path or "").replace("\\", "/")
+        if not old_path or not new_path or old_path == new_path:
+            return
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE sources SET source_note_path = ? WHERE source_note_path = ?",
+                (new_path, old_path),
+            )
+            cursor.execute(
+                "UPDATE concept_mentions SET source_note_path = ? WHERE source_note_path = ?",
+                (new_path, old_path),
+            )
+            conn.commit()
+
+    def update_note_path_prefix(self, old_prefix: str, new_prefix: str) -> None:
+        old_prefix = (old_prefix or "").strip("/").replace("\\", "/")
+        new_prefix = (new_prefix or "").strip("/").replace("\\", "/")
+        if not old_prefix or not new_prefix or old_prefix == new_prefix:
+            return
+        old_like = old_prefix + "/%"
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, source_note_path FROM sources WHERE source_note_path LIKE ?", (old_like,))
+            source_rows = [dict(row) for row in cursor.fetchall()]
+            for row in source_rows:
+                next_path = new_prefix + row["source_note_path"][len(old_prefix):]
+                cursor.execute("UPDATE sources SET source_note_path = ? WHERE id = ?", (next_path, row["id"]))
+            cursor.execute("SELECT id, source_note_path FROM concept_mentions WHERE source_note_path LIKE ?", (old_like,))
+            mention_rows = [dict(row) for row in cursor.fetchall()]
+            for row in mention_rows:
+                next_path = new_prefix + row["source_note_path"][len(old_prefix):]
+                cursor.execute("UPDATE concept_mentions SET source_note_path = ? WHERE id = ?", (next_path, row["id"]))
+            conn.commit()
 
     def update_concept_source_frontmatter(self, concept_name: str, source: Dict) -> None:
         file_path = fs_router.locate_concept_file(concept_name)
@@ -279,6 +382,12 @@ class SourceIndex:
                 "timestamp": row["timestamp_label"],
             })
         return edges
+
+    def _json_field(self, raw: str, fallback):
+        try:
+            return json.loads(raw or "")
+        except Exception:
+            return fallback
 
     def _source_note_path(self, source_name: str) -> str:
         safe_name = fs_router.sanitize_filename(source_name)

@@ -1,6 +1,10 @@
 import os
 import re
+import json
+import shutil
 import logging
+import datetime
+import uuid
 from typing import Dict, List, Optional, Tuple
 from Crucible.config import Config
 
@@ -230,6 +234,88 @@ class FSRouter:
         os.replace(path, target)
         self.scan_vault()
         return target
+
+    def trash_path(self, path: str, confirm_name: str) -> Dict:
+        if not path or not os.path.exists(path):
+            raise FileNotFoundError(f"路径不存在: {path}")
+        vault_root = os.path.abspath(self.vault_path)
+        abs_path = os.path.abspath(path)
+        if os.path.commonpath([vault_root, abs_path]) != vault_root:
+            raise ValueError("只能删除 vault 内的文件或目录")
+        basename = os.path.basename(abs_path)
+        if confirm_name != basename:
+            raise ValueError("确认名称不匹配")
+
+        trash_id = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        trash_dir = os.path.join(Config.TRASH_DIR, trash_id)
+        os.makedirs(trash_dir, exist_ok=True)
+        stored_path = os.path.join(trash_dir, basename)
+        original_rel_path = self.get_relative_path(abs_path)
+        manifest = {
+            "id": trash_id,
+            "name": basename,
+            "type": "directory" if os.path.isdir(abs_path) else "file",
+            "original_path": original_rel_path,
+            "stored_path": stored_path,
+            "trashed_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        }
+        shutil.move(abs_path, stored_path)
+        with open(os.path.join(trash_dir, "manifest.json"), "w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        self.scan_vault()
+        return manifest
+
+    def list_trash(self) -> List[Dict]:
+        if not os.path.exists(Config.TRASH_DIR):
+            return []
+        items = []
+        for entry in os.scandir(Config.TRASH_DIR):
+            if not entry.is_dir():
+                continue
+            manifest_path = os.path.join(entry.path, "manifest.json")
+            if not os.path.exists(manifest_path):
+                continue
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    manifest = json.load(f)
+                items.append(manifest)
+            except Exception as e:
+                logger.warning(f"读取回收站 manifest 失败: {manifest_path}, {e}")
+        items.sort(key=lambda item: item.get("trashed_at", ""), reverse=True)
+        return items
+
+    def restore_trash(self, trash_id: str) -> Dict:
+        trash_id = (trash_id or "").strip()
+        if not re.match(r'^[0-9A-Za-z_-]+$', trash_id):
+            raise ValueError("非法回收站 ID")
+        trash_dir = os.path.abspath(os.path.join(Config.TRASH_DIR, trash_id))
+        trash_root = os.path.abspath(Config.TRASH_DIR)
+        if os.path.commonpath([trash_root, trash_dir]) != trash_root:
+            raise ValueError("非法回收站路径")
+        manifest_path = os.path.join(trash_dir, "manifest.json")
+        if not os.path.exists(manifest_path):
+            raise FileNotFoundError("回收站项目不存在")
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        stored_path = manifest.get("stored_path") or os.path.join(trash_dir, manifest["name"])
+        if not os.path.exists(stored_path):
+            raise FileNotFoundError("回收站文件不存在")
+
+        target = self._safe_join_vault(manifest.get("original_path", manifest["name"]))
+        if os.path.exists(target):
+            base, ext = os.path.splitext(target)
+            suffix = datetime.datetime.now().strftime("_restored_%Y%m%d_%H%M%S")
+            target = base + suffix + ext
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.move(stored_path, target)
+        try:
+            os.remove(manifest_path)
+            os.rmdir(trash_dir)
+        except OSError:
+            pass
+        self.scan_vault()
+        manifest["restored_path"] = self.get_relative_path(target)
+        return manifest
 
     def get_vault_tree_nodes(self) -> List[Dict]:
         """

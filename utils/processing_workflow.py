@@ -13,6 +13,7 @@ from Crucible.utils.audio_processor import audio_processor
 from Crucible.utils.doc_parser import doc_parser
 from Crucible.utils.fs_router import fs_router
 from Crucible.utils.source_index import source_index
+from Crucible.utils.video_processor import video_processor
 from Crucible.utils.wiki_editor import wiki_editor
 
 
@@ -68,11 +69,6 @@ class ProcessingWorkflow:
             self.progress("第四步: LLM 智能提炼核心概念...", 75)
             extracted_concepts = llm_core.extract_concepts(structured_source)
 
-            self.progress(f"成功提取 {len(extracted_concepts)} 个概念，开始合并织网...", 85)
-            if not extracted_concepts:
-                self.progress(f"未从 {source_payload['source_name']} 中提取到有效概念，已跳过写入。", 90)
-                continue
-
             source_record = source_index.upsert_source(
                 source_name=source_payload["source_name"],
                 source_type=source_payload["source_type"],
@@ -81,10 +77,17 @@ class ProcessingWorkflow:
                 duration=source_payload["duration"],
                 asr_engine=self.options.asr_engine,
                 vlm_model=self.options.vlm_model or Config.VLM_MODEL_NAME,
+                metadata=source_payload.get("metadata", {}),
+                keyframes=source_payload.get("keyframes", []),
             )
             source_index.replace_segments(source_record["id"], source_payload["segments"])
             source_index.replace_concept_mentions(source_record, extracted_concepts)
             source_index.write_source_note(source_record, source_payload["segments"], extracted_concepts)
+
+            self.progress(f"成功提取 {len(extracted_concepts)} 个概念，开始合并织网...", 85)
+            if not extracted_concepts:
+                self.progress(f"未从 {source_payload['source_name']} 中提取到有效概念，已写入来源页。", 90)
+                continue
 
             for idx, concept_item in enumerate(extracted_concepts):
                 concept_name = concept_item["concept"]
@@ -124,10 +127,14 @@ class ProcessingWorkflow:
                 source_type = "document"
             self.progress(f"开始处理源文件: {source_name}", 10)
 
+        source_hash = self._source_hash(source, is_url)
         segments = []
         duration = 0.0
+        metadata = self._build_source_metadata(source, source_ext, source_type, is_url)
+        keyframes = []
         if source_ext in Config.SUPPORTED_VIDEO_FORMATS or source_ext in Config.SUPPORTED_AUDIO_FORMATS:
-            structured_source, segments, duration = self._process_media_source(source, source_ext, is_url)
+            structured_source, segments, duration, keyframes = self._process_media_source(source, source_ext, is_url, source_hash)
+            metadata["duration"] = duration
         elif source_ext in Config.SUPPORTED_DOC_FORMATS:
             self.progress("第一步: 解析并读取文档文本...", 30)
             structured_source = doc_parser.parse_file(source)
@@ -141,13 +148,15 @@ class ProcessingWorkflow:
             "source_ext": source_ext,
             "source_type": source_type,
             "source_uri": source,
-            "source_hash": self._source_hash(source, is_url),
+            "source_hash": source_hash,
             "duration": duration,
+            "metadata": metadata,
+            "keyframes": keyframes,
             "segments": segments,
             "structured_source": self._prepend_source_metadata(source, source_name, structured_source, is_url),
         }
 
-    def _process_media_source(self, source: str, source_ext: str, is_url: bool) -> tuple:
+    def _process_media_source(self, source: str, source_ext: str, is_url: bool, source_hash: str) -> tuple:
         self.progress("第一步: 音频分离与重采样中...", 20)
         wav_path = audio_processor.process_media(source, Config.TEMP_DIR)
         duration = audio_processor.get_audio_duration(wav_path)
@@ -158,16 +167,71 @@ class ProcessingWorkflow:
         full_source_text = "\n".join([f"[{seg['start']}-{seg['end']}s]: {seg['text']}" for seg in segments])
 
         structured_source = "【视频声音转写内容】:\n" + full_source_text + "\n\n"
+        keyframes = []
         if not is_url and source_ext in Config.SUPPORTED_VIDEO_FORMATS:
             self.progress("第三步: 抽取视频关键帧并执行 VLM 分析 (OCR + 描述)...", 60)
             ts_list = [round(duration * 0.1, 2), round(duration * 0.5, 2), round(duration * 0.9, 2)]
             vlm_contexts = vlm_analyzer.analyze_video(source, ts_list)
+            keyframes = self._save_keyframes(source, source_hash, ts_list, vlm_contexts)
             if vlm_contexts:
                 structured_source += "【视频画面抽帧分析】:\n"
                 for ts, ctx in vlm_contexts.items():
                     structured_source += f"- 在 {ts}s 画面:\n  OCR 文字: {ctx['ocr']}\n  画面描述: {ctx['description']}\n"
 
-        return structured_source, segments, duration
+        return structured_source, segments, duration, keyframes
+
+    def _build_source_metadata(self, source: str, source_ext: str, source_type: str, is_url: bool) -> Dict:
+        metadata = {
+            "source_ext": source_ext,
+            "source_type": source_type,
+            "source_uri": source,
+            "is_url": is_url,
+        }
+        if not is_url and os.path.exists(source):
+            metadata["file_size"] = os.path.getsize(source)
+            if source_ext in Config.SUPPORTED_VIDEO_FORMATS:
+                metadata.update(video_processor.get_video_metadata(source))
+            elif source_ext in Config.SUPPORTED_AUDIO_FORMATS:
+                metadata.update({
+                    "resolution": "",
+                    "fps": None,
+                    "audio_streams": 1,
+                    "subtitle_streams": 0,
+                })
+            else:
+                metadata.update({
+                    "resolution": "",
+                    "fps": None,
+                    "audio_streams": 0,
+                    "subtitle_streams": 0,
+                })
+        return metadata
+
+    def _save_keyframes(self, source: str, source_hash: str, timestamps: List[float], vlm_contexts: Dict[float, Dict]) -> List[Dict]:
+        keyframes = []
+        folder = os.path.join(Config.OBSIDIAN_VAULT_PATH, "Attachments", "keyframes", source_hash[:16])
+        for timestamp in timestamps:
+            label = self._format_timestamp(timestamp).replace(":", "-")
+            filename = f"{label}.jpg"
+            output_path = os.path.join(folder, filename)
+            frame = video_processor.extract_frame_at_time(source, timestamp)
+            saved = frame is not None and video_processor.save_frame_jpeg(frame, output_path)
+            context = vlm_contexts.get(timestamp, {})
+            if not saved:
+                continue
+            keyframes.append({
+                "timestamp": timestamp,
+                "timestamp_label": self._format_timestamp(timestamp),
+                "filename": filename,
+                "attachment_rel_path": fs_router.get_relative_path(output_path),
+                "ocr": context.get("ocr", "无"),
+                "description": context.get("description", ""),
+            })
+        return keyframes
+
+    def _format_timestamp(self, seconds: float) -> str:
+        total = max(0, int(seconds or 0))
+        return f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
 
     def _prepend_source_metadata(self, source: str, source_name: str, content: str, is_url: bool) -> str:
         metadata = [

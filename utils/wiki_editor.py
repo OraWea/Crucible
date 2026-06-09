@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class WikiEditor:
     def __init__(self, backup_dir: str = Config.BACKUP_DIR):
         self.backup_dir = backup_dir
-        self.md_parser = MarkdownIt()
+        self.md_parser = MarkdownIt("commonmark", {"html": False})
         os.makedirs(self.backup_dir, exist_ok=True)
 
     def read_wiki(self, file_path: str) -> str:
@@ -155,7 +155,20 @@ class WikiEditor:
             return f"[{item['label']}](crucible://note/{href})"
 
         normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, content or "")
-        return self.md_parser.render(normalized)
+        return self._sanitize_rendered_html(self.md_parser.render(normalized))
+
+    def _sanitize_rendered_html(self, html: str) -> str:
+        """限制 Markdown 链接协议，原生 HTML 已由 markdown-it 禁用。"""
+        allowed = ("http://", "https://", "mailto:", "crucible://note/", "#")
+
+        def clean_href(match):
+            quote_char = match.group(1)
+            href = match.group(2).strip()
+            if href.startswith(allowed):
+                return f'href={quote_char}{href}{quote_char}'
+            return f'href={quote_char}#{quote_char}'
+
+        return re.sub(r'href=(["\'])(.*?)\1', clean_href, html, flags=re.IGNORECASE)
 
     def update_frontmatter_fields(self, content: str, fields: Dict[str, Any]) -> str:
         """更新或创建 Markdown YAML frontmatter 中的简单标量字段。"""

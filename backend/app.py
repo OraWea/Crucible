@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import os
+import requests
 import secrets
 import sys
 import threading
@@ -10,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +78,20 @@ class MoveRequest(BaseModel):
     target_dir: str
 
 
+class DeleteRequest(BaseModel):
+    path: str
+    confirm_name: str
+
+
+class RestoreRequest(BaseModel):
+    trash_id: str
+
+
 class SaveNoteRequest(BaseModel):
+    content: str
+
+
+class PreviewRequest(BaseModel):
     content: str
 
 
@@ -96,6 +110,15 @@ class RuntimeSettingsRequest(BaseModel):
     llm_model: str
     vlm_model: str
     fact_model: str
+    api_key: Optional[str] = None
+    whisper_model: Optional[str] = None
+    whisper_device: Optional[str] = None
+
+
+class ConfigTestRequest(BaseModel):
+    provider: str
+    api_base: str
+    llm_model: str
     api_key: Optional[str] = None
 
 
@@ -174,6 +197,15 @@ def _safe_vault_path(path: str = "") -> str:
 
 def _relative(file_path: str) -> str:
     return fs_router.get_relative_path(file_path)
+
+
+def _sync_path_reference(old_path: str, new_path: str, was_dir: bool) -> None:
+    old_rel = _relative(old_path)
+    new_rel = _relative(new_path)
+    if was_dir:
+        source_index.update_note_path_prefix(old_rel, new_rel)
+    else:
+        source_index.update_note_path_references(old_rel, new_rel)
 
 
 def _serialize_tree(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -327,6 +359,8 @@ def save_runtime_settings(payload: RuntimeSettingsRequest, user: Dict[str, str] 
         vlm_model=payload.vlm_model,
         fact_model=payload.fact_model,
         api_key=payload.api_key,
+        whisper_model=payload.whisper_model,
+        whisper_device=payload.whisper_device,
     )
     Config.update_llm_runtime(
         api_key=payload.api_key,
@@ -338,6 +372,41 @@ def save_runtime_settings(payload: RuntimeSettingsRequest, user: Dict[str, str] 
     )
     db_manager.add_log("INFO", "Backend", "Save_Runtime_Settings", f"用户 {user['username']} 更新模型配置")
     return {"ok": True, "has_valid_api_key": Config.has_valid_api_key(payload.api_key)}
+
+
+@app.post("/api/config/test")
+def test_runtime_settings(payload: ConfigTestRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    provider = payload.provider.strip()
+    api_base = payload.api_base.rstrip("/")
+    if provider in ("ollama", "lmstudio"):
+        try:
+            response = requests.get(f"{api_base}/models", timeout=5)
+            return {
+                "ok": response.status_code < 500,
+                "status": response.status_code,
+                "message": "本地 OpenAI-compatible 服务可访问" if response.status_code < 500 else "本地服务返回错误",
+                "has_valid_api_key": True,
+            }
+        except Exception as exc:
+            return {"ok": False, "status": 0, "message": f"本地服务不可访问: {exc}", "has_valid_api_key": True}
+
+    if not payload.api_key or payload.api_key.strip() == "your-api-key":
+        return {"ok": False, "status": 0, "message": "缺少有效 API Key", "has_valid_api_key": False}
+
+    try:
+        response = requests.get(
+            f"{api_base}/models",
+            headers={"Authorization": f"Bearer {payload.api_key}"},
+            timeout=8,
+        )
+        return {
+            "ok": response.status_code < 500,
+            "status": response.status_code,
+            "message": "Provider 配置可访问" if response.status_code < 500 else "Provider 返回错误",
+            "has_valid_api_key": True,
+        }
+    except Exception as exc:
+        return {"ok": False, "status": 0, "message": f"Provider 测试失败: {exc}", "has_valid_api_key": True}
 
 
 @app.get("/api/templates")
@@ -382,7 +451,9 @@ def create_note(payload: CreateNoteRequest, user: Dict[str, str] = Depends(_curr
 @app.post("/api/vault/rename")
 def rename_path(payload: RenameRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     path = _safe_vault_path(payload.path)
+    was_dir = os.path.isdir(path)
     new_path = fs_router.rename_path(path, payload.new_name)
+    _sync_path_reference(path, new_path, was_dir)
     db_manager.add_log("INFO", "Backend", "Rename_Path", f"{_relative(path)} -> {_relative(new_path)}")
     return {"path": _relative(new_path), "abs_path": new_path}
 
@@ -391,9 +462,38 @@ def rename_path(payload: RenameRequest, user: Dict[str, str] = Depends(_current_
 def move_path(payload: MoveRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     path = _safe_vault_path(payload.path)
     target_dir = _safe_vault_path(payload.target_dir)
+    was_dir = os.path.isdir(path)
     new_path = fs_router.move_path(path, target_dir)
+    _sync_path_reference(path, new_path, was_dir)
     db_manager.add_log("INFO", "Backend", "Move_Path", f"{_relative(path)} -> {_relative(new_path)}")
     return {"path": _relative(new_path), "abs_path": new_path}
+
+
+@app.post("/api/vault/delete")
+def delete_path(payload: DeleteRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    path = _safe_vault_path(payload.path)
+    manifest = fs_router.trash_path(path, payload.confirm_name)
+    db_manager.add_log("WARNING", "Backend", "Trash_Path", f"用户 {user['username']} 移入回收站: {manifest['original_path']}")
+    return {"ok": True, "trash": manifest}
+
+
+@app.get("/api/vault/trash")
+def list_trash(user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    return {"items": fs_router.list_trash()}
+
+
+@app.post("/api/vault/restore")
+def restore_path(payload: RestoreRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    manifest = fs_router.restore_trash(payload.trash_id)
+    original_path = manifest.get("original_path", "")
+    restored_path = manifest.get("restored_path", "")
+    if original_path and restored_path and original_path != restored_path:
+        if manifest.get("type") == "directory":
+            source_index.update_note_path_prefix(original_path, restored_path)
+        else:
+            source_index.update_note_path_references(original_path, restored_path)
+    db_manager.add_log("INFO", "Backend", "Restore_Path", f"用户 {user['username']} 恢复: {restored_path}")
+    return {"ok": True, "restored": manifest}
 
 
 @app.get("/api/vault/organization-rules")
@@ -417,6 +517,11 @@ def save_note(note_path: str, payload: SaveNoteRequest, user: Dict[str, str] = D
     fs_router.scan_vault()
     db_manager.add_log("INFO", "Backend", "Manual_Save", f"用户 {user['username']} 保存笔记: {_relative(file_path)}")
     return _note_payload(file_path)
+
+
+@app.post("/api/notes/preview")
+def preview_note(payload: PreviewRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, str]:
+    return {"preview_html": wiki_editor.render_markdown_preview(payload.content)}
 
 
 @app.post("/api/notes/open-wiki-target")
@@ -472,6 +577,7 @@ def start_process(payload: ProcessRequest, user: Dict[str, str] = Depends(_curre
             "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "updated_at": datetime.datetime.now().isoformat(timespec="seconds"),
             "user": user["username"],
+            "payload": payload.model_dump() if hasattr(payload, "model_dump") else payload.dict(),
         }
 
     def progress(message: str, value: int) -> None:
@@ -524,6 +630,17 @@ def get_process_job(job_id: str, user: Dict[str, str] = Depends(_current_user)) 
     return job
 
 
+@app.post("/api/process/{job_id}/retry")
+def retry_process_job(job_id: str, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    payload_data = job.get("payload")
+    if not payload_data:
+        raise HTTPException(status_code=400, detail="Job payload is not available")
+    return start_process(ProcessRequest(**payload_data), user)
+
+
 @app.get("/api/process")
 def list_process_jobs(user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     with _jobs_lock:
@@ -568,6 +685,31 @@ def list_sources(user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any
     return {"sources": rows}
 
 
+@app.get("/api/sources/{source_id}")
+def get_source(source_id: int, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
+    detail = source_index.get_source_detail(source_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return detail
+
+
 @app.get("/api/sources/{source_id}/segments")
 def list_source_segments(source_id: int, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     return {"segments": source_index.get_segments(source_id)}
+
+
+@app.get("/api/sources/{source_id}/keyframes/{filename}")
+def get_source_keyframe(source_id: int, filename: str, user: Dict[str, str] = Depends(_current_user)) -> FileResponse:
+    detail = source_index.get_source_detail(source_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Source not found")
+    keyframe = next((item for item in detail["keyframes"] if item.get("filename") == filename), None)
+    if not keyframe:
+        raise HTTPException(status_code=404, detail="Keyframe not found")
+    rel_path = keyframe.get("attachment_rel_path") or keyframe.get("rel_path")
+    if not rel_path:
+        raise HTTPException(status_code=404, detail="Keyframe path not found")
+    file_path = _safe_vault_path(rel_path)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Keyframe file not found")
+    return FileResponse(file_path, media_type="image/jpeg")

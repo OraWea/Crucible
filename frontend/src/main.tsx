@@ -13,96 +13,59 @@ import {
   FolderOpen,
   GitFork,
   Hash,
+  Image as ImageIcon,
   Link2,
   ListChecks,
   Loader2,
   LogOut,
   MoreHorizontal,
+  MoveRight,
   PanelRight,
   Play,
+  RotateCcw,
   Save,
   Search,
   Settings2,
   ShieldAlert,
   Sparkles,
+  Trash2,
   UploadCloud,
+  UserPlus,
   Video
 } from "lucide-react";
 import "./styles.css";
-
-type User = {
-  username: string;
-  role: "admin" | "user";
-};
-
-type VaultNode = {
-  name: string;
-  type: "directory" | "file";
-  path: string;
-  abs_path?: string;
-  children?: VaultNode[];
-};
-
-type NotePayload = {
-  path: string;
-  name: string;
-  anchor?: string;
-  content: string;
-  preview_html: string;
-  frontmatter: Record<string, unknown>;
-  outgoing_links: Array<{ raw: string; target: string; anchor: string; label: string }>;
-  backlinks: Array<{ source: string; path: string; label: string }>;
-  source_mentions: Array<{ concept_name: string; source_note_path: string; timestamp_label: string }>;
-  tags: string[] | string;
-};
-
-type SourceRecord = {
-  id: number;
-  source_name: string;
-  source_type: string;
-  source_uri: string;
-  duration?: number;
-  source_note_path: string;
-  updated_at?: string;
-};
-
-type SegmentRecord = {
-  id: number;
-  timestamp_label: string;
-  text: string;
-  start_time: number;
-  end_time: number;
-};
-
-type GraphData = {
-  nodes: Array<{ id: string; path: string; in_degree: number; out_degree: number }>;
-  edges: Array<{ source: string; target: string; source_path: string; type: string; timestamp: string }>;
-};
-
-type SearchResult = {
-  source_name: string;
-  source_note_path: string;
-  timestamp_label: string;
-  text: string;
-  concepts: string;
-};
-
-type ProcessJob = {
-  id: string;
-  status: "queued" | "running" | "succeeded" | "failed";
-  progress: number;
-  logs: Array<{ message: string; progress: number; time: string }>;
-  result?: { processed_sources: number; written_notes: number };
-  error?: string;
-};
-
-type ProviderInfo = {
-  key: string;
-  label: string;
-  preset: { api_base: string; model: string; vlm_model?: string };
-};
+import type {
+  ConfigTestResult,
+  GraphData,
+  NotePayload,
+  ProcessJob,
+  ProviderInfo,
+  SearchResult,
+  SegmentRecord,
+  SourceDetail,
+  SourceRecord,
+  TrashItem,
+  User,
+  VaultNode
+} from "./types";
+import {
+  displayMeta,
+  displayTags,
+  findFirstNote,
+  flattenDirectories,
+  flattenNotes,
+  formatDuration,
+  normalizeUrlInput,
+  parentPathOf,
+  sourceKind
+} from "./utils";
 
 const TOKEN_KEY = "crucible_web_token";
+const DEFAULT_TEMPLATES = ["空白"];
+const DEFAULT_ASR_OPTIONS = {
+  whisper_lang: "auto",
+  asr_engine: "dashscope"
+};
 
 const navItems = [
   { label: "Vault", icon: FolderOpen },
@@ -112,36 +75,16 @@ const navItems = [
   { label: "设置", icon: Settings2 }
 ];
 
-function sourceKind(sourceType = "") {
-  if (sourceType.includes("audio")) return "audio";
-  if (sourceType.includes("document") || sourceType.includes("pdf") || sourceType.includes("doc")) return "document";
-  return "video";
-}
-
 function SourceIcon({ kind }: { kind: string }) {
   if (kind === "audio") return <AudioLines size={16} />;
   if (kind === "document") return <FileText size={16} />;
   return <Video size={16} />;
 }
 
-function formatDuration(seconds?: number) {
-  if (!seconds) return "未知时长";
-  const total = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(total / 3600).toString().padStart(2, "0");
-  const m = Math.floor((total % 3600) / 60).toString().padStart(2, "0");
-  const s = Math.floor(total % 60).toString().padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
-function displayTags(tags: NotePayload["tags"]) {
-  if (Array.isArray(tags)) return tags;
-  if (!tags) return [];
-  return String(tags).split(",").map((tag) => tag.trim()).filter(Boolean);
-}
-
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || "");
   const [user, setUser] = useState<User | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
@@ -149,11 +92,21 @@ function App() {
   const [activeNav, setActiveNav] = useState("Vault");
 
   const [tree, setTree] = useState<VaultNode[]>([]);
+  const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
+  const [newItemParent, setNewItemParent] = useState("");
+  const [newNoteTemplate, setNewNoteTemplate] = useState(DEFAULT_TEMPLATES[0]);
   const [sources, setSources] = useState<SourceRecord[]>([]);
   const [activeSource, setActiveSource] = useState<SourceRecord | null>(null);
+  const [sourceDetail, setSourceDetail] = useState<SourceDetail | null>(null);
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [keyframeUrls, setKeyframeUrls] = useState<Record<string, string>>({});
   const [segments, setSegments] = useState<SegmentRecord[]>([]);
   const [note, setNote] = useState<NotePayload | null>(null);
+  const [activeAnchor, setActiveAnchor] = useState("");
   const [editorContent, setEditorContent] = useState("");
+  const [editorMode, setEditorMode] = useState<"edit" | "preview">("edit");
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewPending, setPreviewPending] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
   const [graphSummary, setGraphSummary] = useState("");
@@ -162,6 +115,7 @@ function App() {
   const [jobs, setJobs] = useState<ProcessJob[]>([]);
   const [activeJobId, setActiveJobId] = useState("");
   const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
+  const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [settings, setSettings] = useState({
     provider: "dashscope",
@@ -169,9 +123,16 @@ function App() {
     llm_model: "",
     vlm_model: "",
     fact_model: "",
+    whisper_model: "base",
+    whisper_device: "cpu",
     api_key: ""
   });
+  const [settingsStatus, setSettingsStatus] = useState<ConfigTestResult | null>(null);
+  const [asrOptions, setAsrOptions] = useState(DEFAULT_ASR_OPTIONS);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const previousJobStatusesRef = useRef<Record<string, ProcessJob["status"]>>({});
 
   const api = useCallback(async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
     const headers = new Headers(options.headers);
@@ -193,6 +154,16 @@ function App() {
     return response.text() as T;
   }, [token]);
 
+  const apiBlob = useCallback(async (path: string): Promise<Blob> => {
+    const headers = new Headers();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(path, { headers });
+    if (!response.ok) {
+      throw new Error(response.statusText);
+    }
+    return response.blob();
+  }, [token]);
+
   const showError = useCallback((error: unknown) => {
     setMessage(error instanceof Error ? error.message : String(error));
   }, []);
@@ -203,6 +174,10 @@ function App() {
       const loaded = await api<NotePayload>(`/api/notes/${encodeURIComponent(path).replace(/%2F/g, "/")}${suffix}`);
       setNote(loaded);
       setEditorContent(loaded.content);
+      setPreviewHtml(loaded.preview_html);
+      setActiveAnchor(anchor);
+      setNewItemParent(parentPathOf(loaded.path));
+      if (anchor) setEditorMode("preview");
       setDirty(false);
       setActiveNav("Vault");
     } catch (error) {
@@ -220,8 +195,12 @@ function App() {
   const refreshSources = useCallback(async () => {
     const data = await api<{ sources: SourceRecord[] }>("/api/sources");
     setSources(data.sources);
-    if (!activeSource && data.sources.length > 0) setActiveSource(data.sources[0]);
-  }, [api, activeSource]);
+    setActiveSource((current) => {
+      if (!data.sources.length) return null;
+      if (!current) return data.sources[0];
+      return data.sources.find((source) => source.id === current.id) || data.sources[0];
+    });
+  }, [api]);
 
   const refreshGraph = useCallback(async () => {
     const data = await api<{ graph: GraphData; summary: string }>("/api/graph");
@@ -240,17 +219,33 @@ function App() {
     setJobs(data.jobs);
   }, [api]);
 
+  const refreshTemplates = useCallback(async () => {
+    const data = await api<{ templates: string[] }>("/api/templates");
+    const nextTemplates = data.templates.length ? data.templates : DEFAULT_TEMPLATES;
+    setTemplates(nextTemplates);
+    setNewNoteTemplate((current) => nextTemplates.includes(current) ? current : nextTemplates[0]);
+  }, [api]);
+
+  const refreshTrash = useCallback(async () => {
+    const data = await api<{ items: TrashItem[] }>("/api/vault/trash");
+    setTrashItems(data.items);
+  }, [api]);
+
+  const refreshKnowledgeState = useCallback(async () => {
+    await Promise.all([refreshVault(), refreshSources(), refreshGraph(), refreshLogs(), refreshTrash()]);
+  }, [refreshVault, refreshSources, refreshGraph, refreshLogs, refreshTrash]);
+
   const refreshAll = useCallback(async () => {
     try {
       setLoading(true);
-      await Promise.all([refreshVault(), refreshSources(), refreshGraph(), refreshJobs(), refreshLogs()]);
+      await Promise.all([refreshKnowledgeState(), refreshJobs(), refreshTemplates()]);
       setMessage("已同步后端状态");
     } catch (error) {
       showError(error);
     } finally {
       setLoading(false);
     }
-  }, [refreshVault, refreshSources, refreshGraph, refreshJobs, refreshLogs, showError]);
+  }, [refreshKnowledgeState, refreshJobs, refreshTemplates, showError]);
 
   const login = async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -271,12 +266,58 @@ function App() {
     }
   };
 
-  const logout = () => {
+  const register = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    try {
+      setLoading(true);
+      const created = await api<User>("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify({ username, password, role: "user" })
+      });
+      setAuthMode("login");
+      setMessage(`已创建用户：${created.username}，请登录`);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearSession = () => {
     localStorage.removeItem(TOKEN_KEY);
     setToken("");
     setUser(null);
     setNote(null);
+    setActiveAnchor("");
+    setPreviewHtml("");
+    setEditorMode("edit");
     setTree([]);
+    setSources([]);
+    setActiveSource(null);
+    setSourceDetail(null);
+    setSourceFilter("");
+    Object.values(keyframeUrls).forEach((url) => URL.revokeObjectURL(url));
+    setKeyframeUrls({});
+    setSegments([]);
+    setGraph({ nodes: [], edges: [] });
+    setGraphSummary("");
+    setSearchResults([]);
+    setJobs([]);
+    setLogs([]);
+    setTrashItems([]);
+    setSettingsStatus(null);
+  };
+
+  const logout = async () => {
+    try {
+      if (token) {
+        await api("/api/auth/logout", { method: "POST" });
+      }
+    } catch {
+      // 后端会话已失效时仍要清理本地状态。
+    } finally {
+      clearSession();
+    }
   };
 
   useEffect(() => {
@@ -304,13 +345,47 @@ function App() {
 
   useEffect(() => {
     if (!activeSource) {
+      setSourceDetail(null);
       setSegments([]);
       return;
     }
-    api<{ segments: SegmentRecord[] }>(`/api/sources/${activeSource.id}/segments`)
-      .then((data) => setSegments(data.segments))
-      .catch(() => setSegments([]));
+    api<SourceDetail>(`/api/sources/${activeSource.id}`)
+      .then((data) => {
+        setSourceDetail(data);
+        setSegments(data.segments);
+      })
+      .catch(() => {
+        setSourceDetail(null);
+        setSegments([]);
+      });
   }, [activeSource, api]);
+
+  useEffect(() => {
+    const urls: Record<string, string> = {};
+    let cancelled = false;
+
+    async function loadKeyframes() {
+      if (!activeSource || !sourceDetail?.keyframes.length) {
+        setKeyframeUrls({});
+        return;
+      }
+      await Promise.all(sourceDetail.keyframes.map(async (frame) => {
+        try {
+          const blob = await apiBlob(`/api/sources/${activeSource.id}/keyframes/${encodeURIComponent(frame.filename)}`);
+          urls[frame.filename] = URL.createObjectURL(blob);
+        } catch {
+          // 单张关键帧丢失时保留其他图片。
+        }
+      }));
+      if (!cancelled) setKeyframeUrls(urls);
+    }
+
+    loadKeyframes();
+    return () => {
+      cancelled = true;
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [activeSource, apiBlob, sourceDetail?.keyframes]);
 
   useEffect(() => {
     if (!jobs.some((job) => job.status === "running" || job.status === "queued")) return;
@@ -318,10 +393,114 @@ function App() {
     return () => window.clearInterval(id);
   }, [jobs, refreshJobs]);
 
+  useEffect(() => {
+    const previous = previousJobStatusesRef.current;
+    const completedJob = jobs.find((job) => {
+      const oldStatus = previous[job.id];
+      return (oldStatus === "queued" || oldStatus === "running") && (job.status === "succeeded" || job.status === "failed");
+    });
+
+    previousJobStatusesRef.current = Object.fromEntries(jobs.map((job) => [job.id, job.status]));
+    if (!completedJob) return;
+
+    if (completedJob.status === "succeeded") {
+      refreshKnowledgeState()
+        .then(() => setMessage("处理任务已完成，知识库状态已刷新"))
+        .catch(showError);
+    } else {
+      refreshLogs().catch(() => undefined);
+      setMessage(`处理任务失败：${completedJob.error || "请查看任务日志"}`);
+    }
+  }, [jobs, refreshKnowledgeState, refreshLogs, showError]);
+
+  useEffect(() => {
+    if (!user || !note) {
+      setPreviewHtml("");
+      return;
+    }
+
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      setPreviewPending(true);
+      api<{ preview_html: string }>("/api/notes/preview", {
+        method: "POST",
+        body: JSON.stringify({ content: editorContent })
+      })
+        .then((data) => {
+          if (!cancelled) setPreviewHtml(data.preview_html);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (!cancelled) setPreviewPending(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, [api, editorContent, note?.path, user]);
+
+  useEffect(() => {
+    if (!activeAnchor || !note) return;
+
+    const id = window.setTimeout(() => {
+      if (editorMode === "edit") {
+        const editor = editorRef.current;
+        const index = editorContent.indexOf(activeAnchor);
+        if (!editor || index < 0) return;
+        editor.focus();
+        editor.setSelectionRange(index, index + activeAnchor.length);
+        return;
+      }
+
+      const preview = previewRef.current;
+      if (!preview) return;
+      const candidates = Array.from(preview.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6,p,li,time"));
+      const matched = candidates.find((item) => (item.textContent || "").includes(activeAnchor));
+      if (!matched) return;
+      preview.querySelectorAll(".anchor-hit").forEach((item) => item.classList.remove("anchor-hit"));
+      matched.classList.add("anchor-hit");
+      matched.scrollIntoView({ block: "center" });
+    }, 80);
+
+    return () => window.clearTimeout(id);
+  }, [activeAnchor, editorContent, editorMode, note, previewHtml]);
+
   const recentNotes = useMemo(() => flattenNotes(tree).slice(0, 8), [tree]);
+  const directoryOptions = useMemo(() => [{ path: "", label: "data/vault" }, ...flattenDirectories(tree)], [tree]);
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0];
   const currentSourceKind = sourceKind(activeSource?.source_type);
-  const activeSegments = segments.slice(0, 6);
+  const filteredSegments = useMemo(() => {
+    const needle = sourceFilter.trim().toLowerCase();
+    if (!needle) return segments;
+    return segments.filter((segment) =>
+      segment.text.toLowerCase().includes(needle) ||
+      segment.timestamp_label.includes(needle)
+    );
+  }, [segments, sourceFilter]);
+  const activeSegments = filteredSegments;
+  const sourceMetadata = sourceDetail?.metadata || {};
+  const processPayload = useCallback((sourcesToProcess: string[]) => ({
+    sources: sourcesToProcess,
+    whisper_lang: asrOptions.whisper_lang,
+    asr_engine: asrOptions.asr_engine,
+    provider: settings.provider,
+    api_base: settings.api_base,
+    llm_model: settings.llm_model,
+    vlm_model: settings.vlm_model,
+    fact_model: settings.fact_model,
+    api_key: settings.api_key || undefined
+  }), [asrOptions, settings]);
+
+  const trackStartedJob = useCallback((jobId: string) => {
+    previousJobStatusesRef.current = {
+      ...previousJobStatusesRef.current,
+      [jobId]: "queued"
+    };
+    setActiveJobId(jobId);
+    setActiveNav("来源");
+  }, []);
 
   const saveNote = async () => {
     if (!note) return;
@@ -332,6 +511,7 @@ function App() {
       });
       setNote(saved);
       setEditorContent(saved.content);
+      setPreviewHtml(saved.preview_html);
       setDirty(false);
       setMessage("笔记已保存");
       await Promise.all([refreshVault(), refreshGraph()]);
@@ -346,10 +526,14 @@ function App() {
     try {
       const created = await api<NotePayload>("/api/vault/notes", {
         method: "POST",
-        body: JSON.stringify({ name, parent_path: "", template: "空白" })
+        body: JSON.stringify({ name, parent_path: newItemParent, template: newNoteTemplate })
       });
       setNote(created);
       setEditorContent(created.content);
+      setPreviewHtml(created.preview_html);
+      setEditorMode("edit");
+      setActiveAnchor("");
+      setNewItemParent(parentPathOf(created.path));
       setDirty(false);
       await refreshVault();
     } catch (error) {
@@ -363,7 +547,7 @@ function App() {
     try {
       await api("/api/vault/folders", {
         method: "POST",
-        body: JSON.stringify({ name, parent_path: "" })
+        body: JSON.stringify({ name, parent_path: newItemParent })
       });
       await refreshVault();
       setMessage("文件夹已创建");
@@ -394,9 +578,52 @@ function App() {
       const rules = await api<NotePayload>("/api/vault/organization-rules");
       setNote(rules);
       setEditorContent(rules.content);
+      setPreviewHtml(rules.preview_html);
+      setEditorMode("edit");
+      setActiveAnchor("");
+      setNewItemParent(parentPathOf(rules.path));
       setDirty(false);
     } catch (error) {
       showError(error);
+    }
+  };
+
+  const openWikiTarget = async (target: string) => {
+    try {
+      const loaded = await api<NotePayload>("/api/notes/open-wiki-target", {
+        method: "POST",
+        body: JSON.stringify({ target })
+      });
+      setNote(loaded);
+      setEditorContent(loaded.content);
+      setPreviewHtml(loaded.preview_html);
+      setActiveAnchor(loaded.anchor || "");
+      setNewItemParent(parentPathOf(loaded.path));
+      if (loaded.anchor) setEditorMode("preview");
+      setDirty(false);
+      setActiveNav("Vault");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const handlePreviewClick = async (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const link = target.closest<HTMLAnchorElement>("a");
+    if (!link) return;
+
+    const href = link.getAttribute("href") || "";
+    if (href.startsWith("crucible://note/")) {
+      event.preventDefault();
+      await openWikiTarget(decodeURIComponent(href.replace("crucible://note/", "")));
+      return;
+    }
+
+    if (/^https?:\/\//i.test(href)) {
+      event.preventDefault();
+      window.open(href, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -430,19 +657,9 @@ function App() {
       });
       const process = await api<{ job_id: string }>("/api/process", {
         method: "POST",
-        body: JSON.stringify({
-          sources: uploaded.files.map((file) => file.path),
-          whisper_lang: "auto",
-          asr_engine: "dashscope",
-          provider: settings.provider,
-          api_base: settings.api_base,
-          llm_model: settings.llm_model,
-          vlm_model: settings.vlm_model,
-          fact_model: settings.fact_model,
-          api_key: settings.api_key || undefined
-        })
+        body: JSON.stringify(processPayload(uploaded.files.map((file) => file.path)))
       });
-      setActiveJobId(process.job_id);
+      trackStartedJob(process.job_id);
       setMessage("处理任务已启动");
       await refreshJobs();
     } catch (error) {
@@ -458,18 +675,9 @@ function App() {
     try {
       const data = await api<{ job_id: string }>("/api/process", {
         method: "POST",
-        body: JSON.stringify({
-          sources: [activeSource.source_uri],
-          whisper_lang: "auto",
-          provider: settings.provider,
-          api_base: settings.api_base,
-          llm_model: settings.llm_model,
-          vlm_model: settings.vlm_model,
-          fact_model: settings.fact_model,
-          api_key: settings.api_key || undefined
-        })
+        body: JSON.stringify(processPayload([activeSource.source_uri]))
       });
-      setActiveJobId(data.job_id);
+      trackStartedJob(data.job_id);
       setMessage("当前来源已加入处理任务");
       await refreshJobs();
     } catch (error) {
@@ -478,27 +686,17 @@ function App() {
   };
 
   const addUrlAndProcess = async () => {
-    const url = window.prompt("输入在线视频或网页来源 URL", "https://");
-    if (!url || !/^https?:\/\/\S+$/i.test(url.trim())) {
+    const url = normalizeUrlInput(window.prompt("输入在线视频或网页来源 URL", "https://") || "");
+    if (!url || !/^https?:\/\/\S+$/i.test(url)) {
       if (url) setMessage("请输入合法的 HTTP/HTTPS 链接");
       return;
     }
     try {
       const data = await api<{ job_id: string }>("/api/process", {
         method: "POST",
-        body: JSON.stringify({
-          sources: [url.trim()],
-          whisper_lang: "auto",
-          provider: settings.provider,
-          api_base: settings.api_base,
-          llm_model: settings.llm_model,
-          vlm_model: settings.vlm_model,
-          fact_model: settings.fact_model,
-          api_key: settings.api_key || undefined
-        })
+        body: JSON.stringify(processPayload([url]))
       });
-      setActiveJobId(data.job_id);
-      setActiveNav("来源");
+      trackStartedJob(data.job_id);
       setMessage("URL 来源处理任务已启动");
       await refreshJobs();
     } catch (error) {
@@ -533,26 +731,108 @@ function App() {
     }
   };
 
+  const testSettings = async () => {
+    try {
+      const result = await api<ConfigTestResult>("/api/config/test", {
+        method: "POST",
+        body: JSON.stringify(settings)
+      });
+      setSettingsStatus(result);
+      setMessage(result.message);
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const retryJob = async (jobId: string) => {
+    try {
+      const data = await api<{ job_id: string }>(`/api/process/${jobId}/retry`, { method: "POST" });
+      trackStartedJob(data.job_id);
+      await refreshJobs();
+      setMessage("失败任务已重新加入队列");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const moveVaultPath = async (path: string) => {
+    const targetDir = window.prompt("移动到目录路径，例如 Concepts 或 Sources", newItemParent || "");
+    if (targetDir === null) return;
+    try {
+      const moved = await api<{ path: string }>("/api/vault/move", {
+        method: "POST",
+        body: JSON.stringify({ path, target_dir: targetDir })
+      });
+      await refreshKnowledgeState();
+      if (note?.path === path) await openNote(moved.path);
+      setMessage("已移动");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const deleteVaultPath = async (path: string, name: string) => {
+    const confirmName = window.prompt(`输入名称以移入回收站：${name}`);
+    if (!confirmName) return;
+    try {
+      await api("/api/vault/delete", {
+        method: "POST",
+        body: JSON.stringify({ path, confirm_name: confirmName })
+      });
+      if (note?.path === path) {
+        setNote(null);
+        setEditorContent("");
+        setPreviewHtml("");
+        setDirty(false);
+      }
+      await refreshKnowledgeState();
+      setMessage("已移入回收站");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
+  const restoreTrashItem = async (trashId: string) => {
+    try {
+      const restored = await api<{ restored: { restored_path: string } }>("/api/vault/restore", {
+        method: "POST",
+        body: JSON.stringify({ trash_id: trashId })
+      });
+      await refreshKnowledgeState();
+      if (restored.restored?.restored_path?.endsWith(".md")) {
+        await openNote(restored.restored.restored_path);
+      }
+      setMessage("已从回收站恢复");
+    } catch (error) {
+      showError(error);
+    }
+  };
+
   const selectProvider = (providerKey: string) => {
     const provider = providers.find((item) => item.key === providerKey);
+    setSettingsStatus(null);
     setSettings((current) => ({
       ...current,
       provider: providerKey,
       api_base: provider?.preset.api_base || current.api_base,
       llm_model: provider?.preset.model || current.llm_model,
-      vlm_model: provider?.preset.vlm_model || provider?.preset.model || current.vlm_model
+      vlm_model: provider?.preset.vlm_model || provider?.preset.model || current.vlm_model,
+      fact_model: provider?.preset.model || current.fact_model
     }));
+    if (providerKey === "ollama" || providerKey === "lmstudio") {
+      setAsrOptions((current) => ({ ...current, asr_engine: "local" }));
+    }
   };
 
   if (!user) {
     return (
       <main className="login-shell">
-        <form className="login-card sketch-card" onSubmit={login}>
+        <form className="login-card sketch-card" onSubmit={authMode === "login" ? login : register}>
           <div className="brand-mark">
             <span className="brand-sigil">C</span>
             <div>
               <p className="eyebrow">Crucible Web</p>
-              <h1>登录知识库</h1>
+              <h1>{authMode === "login" ? "登录知识库" : "注册账户"}</h1>
             </div>
           </div>
           <label>
@@ -564,8 +844,18 @@ function App() {
             <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </label>
           <button className="marker-button primary" type="submit" disabled={loading}>
-            {loading ? <Loader2 size={17} className="spin" /> : <Play size={17} />}
-            登录
+            {loading ? <Loader2 size={17} className="spin" /> : authMode === "login" ? <Play size={17} /> : <UserPlus size={17} />}
+            {authMode === "login" ? "登录" : "注册"}
+          </button>
+          <button
+            className="marker-button"
+            type="button"
+            onClick={() => {
+              setAuthMode(authMode === "login" ? "register" : "login");
+              setMessage("");
+            }}
+          >
+            {authMode === "login" ? "创建新账户" : "返回登录"}
           </button>
           {message && <p className="message-line">{message}</p>}
         </form>
@@ -609,7 +899,21 @@ function App() {
               <button aria-label="新建笔记" onClick={createNote}><FilePlus2 size={16} /></button>
             </div>
           </div>
-          <Tree nodes={tree} activePath={note?.path || ""} onOpenNote={openNote} />
+          <div className="vault-create-options">
+            <select value={newItemParent} onChange={(event) => setNewItemParent(event.target.value)} aria-label="新建位置">
+              {directoryOptions.map((item) => <option key={item.path || "root"} value={item.path}>{item.label}</option>)}
+            </select>
+            <select value={newNoteTemplate} onChange={(event) => setNewNoteTemplate(event.target.value)} aria-label="新建笔记模板">
+              {templates.map((template) => <option key={template} value={template}>{template}</option>)}
+            </select>
+          </div>
+          <Tree
+            nodes={tree}
+            activePath={note?.path || ""}
+            onOpenNote={openNote}
+            onMove={moveVaultPath}
+            onDelete={deleteVaultPath}
+          />
         </section>
       </aside>
 
@@ -618,7 +922,7 @@ function App() {
           <label className="search-box">
             <Search size={18} />
             <input
-              placeholder="搜索笔记、来源、概念或时间戳..."
+              placeholder="搜索来源片段、来源名或关联概念..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -627,7 +931,14 @@ function App() {
             />
           </label>
           <div className="command-actions">
-            <input ref={fileInputRef} type="file" multiple hidden onChange={(event) => uploadAndProcess(event.target.files)} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              accept=".mp4,.mkv,.avi,.mov,.webm,.mp3,.wav,.m4a,.flac,.aac,.pdf,.txt,.md"
+              onChange={(event) => uploadAndProcess(event.target.files)}
+            />
             <button className="marker-button" onClick={() => fileInputRef.current?.click()}>
               <UploadCloud size={17} />
               导入来源
@@ -672,7 +983,45 @@ function App() {
               </div>
             </div>
 
-            <div className="segment-list">
+            {activeSource && (
+              <div className="source-meta-grid">
+                <span><strong>Hash</strong>{displayMeta(activeSource.source_hash)}</span>
+                <span><strong>分辨率</strong>{displayMeta(sourceMetadata.resolution)}</span>
+                <span><strong>FPS</strong>{displayMeta(sourceMetadata.fps)}</span>
+                <span><strong>音轨</strong>{displayMeta(sourceMetadata.audio_streams)}</span>
+                <span><strong>字幕</strong>{displayMeta(sourceMetadata.subtitle_streams)}</span>
+                <span><strong>大小</strong>{sourceMetadata.file_size ? `${Math.round(Number(sourceMetadata.file_size) / 1024 / 1024 * 10) / 10} MB` : "未知"}</span>
+              </div>
+            )}
+
+            {sourceDetail?.keyframes.length ? (
+              <div className="keyframe-strip">
+                {sourceDetail.keyframes.map((frame) => (
+                  <button
+                    className="keyframe-card"
+                    key={`${frame.filename}-${frame.timestamp_label}`}
+                    onClick={() => activeSource && openNote(activeSource.source_note_path, frame.timestamp_label)}
+                  >
+                    {keyframeUrls[frame.filename] ? (
+                      <img src={keyframeUrls[frame.filename]} alt={frame.timestamp_label} />
+                    ) : (
+                      <span className="keyframe-placeholder"><ImageIcon size={18} /></span>
+                    )}
+                    <strong>{frame.timestamp_label}</strong>
+                    <small>{frame.description || frame.ocr || "关键帧"}</small>
+                  </button>
+                ))}
+              </div>
+            ) : activeSource && currentSourceKind === "video" ? (
+              <div className="empty-state">暂无关键帧。重新处理本地视频后会保存抽帧 OCR 与画面描述。</div>
+            ) : null}
+
+            <label className="inline-filter">
+              <Search size={15} />
+              <input value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} placeholder="筛选片段或时间戳" />
+            </label>
+
+            <div className="segment-list scroll-list">
               {activeSegments.length > 0 ? activeSegments.map((segment, index) => (
                 <button
                   className={`segment-row tone-${["blue", "yellow", "green"][index % 3]}`}
@@ -692,8 +1041,8 @@ function App() {
 
           <article className="editor-pane sketch-card">
             <div className="editor-tabs">
-              <button className="paper-tab active">编辑</button>
-              <button className="paper-tab" onClick={() => note && setMessage("预览 HTML 已在右侧上下文同步生成")}>预览</button>
+              <button className={`paper-tab ${editorMode === "edit" ? "active" : ""}`} onClick={() => setEditorMode("edit")}>编辑</button>
+              <button className={`paper-tab ${editorMode === "preview" ? "active" : ""}`} onClick={() => setEditorMode("preview")} disabled={!note}>预览</button>
               <button className="paper-tab" onClick={openOrganizationRules}>整理规则</button>
               <button className="paper-tab" onClick={renameCurrentNote} disabled={!note}>重命名</button>
               <button className="paper-tab" onClick={saveNote} disabled={!note || !dirty}><Save size={15} /> 保存</button>
@@ -709,15 +1058,30 @@ function App() {
               </div>
             </div>
 
-            <textarea
-              className="markdown-editor"
-              value={editorContent}
-              onChange={(event) => {
-                setEditorContent(event.target.value);
-                setDirty(true);
-              }}
-              placeholder="打开或创建笔记后开始编辑..."
-            />
+            {editorMode === "edit" ? (
+              <textarea
+                ref={editorRef}
+                className="markdown-editor"
+                value={editorContent}
+                onChange={(event) => {
+                  setEditorContent(event.target.value);
+                  setDirty(true);
+                }}
+                placeholder="打开或创建笔记后开始编辑..."
+              />
+            ) : (
+              <div className="preview-shell">
+                <div className="preview-status">
+                  <span>{previewPending ? "正在渲染" : dirty ? "未保存预览" : "已保存预览"}</span>
+                </div>
+                <div
+                  ref={previewRef}
+                  className="markdown-preview"
+                  onClick={handlePreviewClick}
+                  dangerouslySetInnerHTML={{ __html: previewHtml || "<p>暂无可预览内容。</p>" }}
+                />
+              </div>
+            )}
           </article>
         </section>
 
@@ -748,20 +1112,24 @@ function App() {
                 {searchResults.map((result, index) => (
                   <button className="note-row" key={`${result.source_note_path}-${result.timestamp_label}-${index}`} onClick={() => openSearchResult(result)}>
                     <Search size={15} />
-                    <span>{result.source_name} · {result.timestamp_label}</span>
+                    <span>{result.source_name} · {result.timestamp_label}<em>{result.text}</em></span>
                     <small>{result.concepts || "match"}</small>
                   </button>
                 ))}
+                {!searchResults.length && <div className="empty-state">输入关键词后按 Enter 检索来源片段、标题或概念。</div>}
               </div>
             ) : activeNav === "图谱" ? (
-              <div className="note-list">
-                {graph.edges.slice(0, 8).map((edge, index) => (
+              <div className="graph-workbench">
+                <GraphView graph={graph} currentPath={note?.path || ""} onOpenNote={openNote} />
+                <div className="note-list scroll-list compact-list">
+                {graph.edges.map((edge, index) => (
                   <button className="note-row" key={`${edge.source}-${edge.target}-${index}`} onClick={() => openNote(edge.source_path, edge.timestamp)}>
                     <GitFork size={15} />
                     <span>{edge.source} {"->"} {edge.target}</span>
                     <small>{edge.type}</small>
                   </button>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="note-list">
@@ -826,18 +1194,61 @@ function App() {
               <input value={settings.llm_model} onChange={(event) => setSettings({ ...settings, llm_model: event.target.value })} placeholder="LLM Model" />
               <input value={settings.vlm_model} onChange={(event) => setSettings({ ...settings, vlm_model: event.target.value })} placeholder="VLM Model" />
               <input value={settings.fact_model} onChange={(event) => setSettings({ ...settings, fact_model: event.target.value })} placeholder="Fact Model" />
+              <input value={settings.whisper_model} onChange={(event) => setSettings({ ...settings, whisper_model: event.target.value })} placeholder="Whisper Model" />
+              <select value={settings.whisper_device} onChange={(event) => setSettings({ ...settings, whisper_device: event.target.value })}>
+                <option value="cpu">CPU</option>
+                <option value="cuda">CUDA</option>
+              </select>
               <input type="password" value={settings.api_key} onChange={(event) => setSettings({ ...settings, api_key: event.target.value })} placeholder="API Key" />
-              <button className="marker-button primary" onClick={saveSettings}>保存配置</button>
+              <div className="settings-row">
+                <label>
+                  <span>ASR</span>
+                  <select value={asrOptions.asr_engine} onChange={(event) => setAsrOptions({ ...asrOptions, asr_engine: event.target.value })}>
+                    <option value="dashscope">DashScope</option>
+                    <option value="local">Local Whisper</option>
+                  </select>
+                </label>
+                <label>
+                  <span>语言</span>
+                  <select value={asrOptions.whisper_lang} onChange={(event) => setAsrOptions({ ...asrOptions, whisper_lang: event.target.value })}>
+                    <option value="auto">Auto</option>
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                  </select>
+                </label>
+              </div>
+              {settingsStatus && (
+                <p className={settingsStatus.ok ? "settings-status ok" : "settings-status error"}>
+                  {settingsStatus.message} · {settingsStatus.status || "local"}
+                </p>
+              )}
+              <div className="settings-actions">
+                <button className="marker-button" onClick={testSettings}>测试配置</button>
+                <button className="marker-button primary" onClick={saveSettings}>保存配置</button>
+              </div>
             </div>
           ) : activeNav === "来源" ? (
             <div className="task-list">
               {jobs.slice(0, 5).map((job) => (
-                <button className="job-row" key={job.id} onClick={() => setActiveJobId(job.id)}>
+                <button className={job.id === activeJob?.id ? "job-row active" : "job-row"} key={job.id} onClick={() => setActiveJobId(job.id)}>
                   <span>{job.status}</span>
                   <strong>{job.progress}%</strong>
                 </button>
               ))}
-              {activeJob?.logs.slice(-3).map((log) => <label key={`${log.time}-${log.message}`}><CircleDot size={15} /><span>{log.message}</span></label>)}
+              {activeJob ? (
+                <div className="job-detail">
+                  <p><strong>{activeJob.id.slice(0, 10)}</strong> · {activeJob.status}</p>
+                  {activeJob.result && <p>来源 {activeJob.result.processed_sources} · 笔记 {activeJob.result.written_notes}</p>}
+                  {activeJob.error && <p className="error-text">{activeJob.error}</p>}
+                  {activeJob.status === "failed" && <button className="tiny-button" onClick={() => retryJob(activeJob.id)}>重试</button>}
+                  <div className="job-log-list">
+                    {activeJob.logs.map((log) => (
+                      <label key={`${log.time}-${log.message}`}><CircleDot size={15} /><span>{log.time} · {log.message}</span></label>
+                    ))}
+                  </div>
+                </div>
+              ) : <span className="muted-text">暂无处理任务</span>}
             </div>
           ) : (
             <div className="task-list">
@@ -848,6 +1259,13 @@ function App() {
                 </label>
               ))}
               <label><ListChecks size={15} /><span>保存后自动刷新反链和图谱</span></label>
+              {trashItems.slice(0, 4).map((item) => (
+                <button className="trash-row" key={item.id} onClick={() => restoreTrashItem(item.id)}>
+                  <RotateCcw size={15} />
+                  <span>{item.name}</span>
+                  <small>{item.original_path}</small>
+                </button>
+              ))}
             </div>
           )}
         </section>
@@ -873,42 +1291,126 @@ function App() {
   );
 }
 
-function Tree({ nodes, activePath, onOpenNote }: { nodes: VaultNode[]; activePath: string; onOpenNote: (path: string) => void }) {
-  if (!nodes.length) return <div className="empty-state">Vault 为空，点击新建笔记开始。</div>;
+function GraphView({
+  graph,
+  currentPath,
+  onOpenNote
+}: {
+  graph: GraphData;
+  currentPath: string;
+  onOpenNote: (path: string, anchor?: string) => void;
+}) {
+  const edges = useMemo(() => {
+    const scoped = currentPath ? graph.edges.filter((edge) => edge.source_path === currentPath) : [];
+    return (scoped.length ? scoped : graph.edges).slice(0, 18);
+  }, [currentPath, graph.edges]);
+
+  const nodeIds = Array.from(new Set(edges.flatMap((edge) => [edge.source, edge.target]))).slice(0, 14);
+  const positions = nodeIds.map((id, index) => {
+    const angle = (Math.PI * 2 * index) / Math.max(1, nodeIds.length);
+    const radius = id === nodeIds[0] ? 0 : 118;
+    return {
+      id,
+      x: 160 + Math.cos(angle) * radius,
+      y: 135 + Math.sin(angle) * radius
+    };
+  });
+  const positionById = Object.fromEntries(positions.map((item) => [item.id, item]));
+  const nodePath = (id: string) => graph.nodes.find((node) => node.id === id)?.path;
+
+  if (!edges.length) return <div className="empty-state">暂无图谱边。处理来源或保存双链后刷新。</div>;
+
   return (
-    <>
-      {nodes.map((node) => (
-        <div className="tree-group" key={node.path}>
-          {node.type === "directory" ? (
-            <>
-              <button className="tree-folder"><ChevronDown size={14} /> {node.name}</button>
-              <div className="tree-children">
-                <Tree nodes={node.children || []} activePath={activePath} onOpenNote={onOpenNote} />
-              </div>
-            </>
-          ) : (
-            <button className={`tree-file ${node.path === activePath ? "selected" : ""}`} onClick={() => onOpenNote(node.path)}>
-              <BookOpen size={15} />
-              <span>{node.name.replace(/\.md$/, "")}</span>
-            </button>
-          )}
-        </div>
-      ))}
-    </>
+    <svg className="graph-canvas" viewBox="0 0 320 270" role="img" aria-label="知识图谱">
+      {edges.map((edge, index) => {
+        const from = positionById[edge.source];
+        const to = positionById[edge.target];
+        if (!from || !to) return null;
+        return (
+          <line
+            key={`${edge.source}-${edge.target}-${index}`}
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
+            className="graph-edge"
+          />
+        );
+      })}
+      {positions.map((node, index) => {
+        const path = nodePath(node.id);
+        return (
+          <g
+            key={node.id}
+            className={`graph-node ${index === 0 ? "primary" : ""}`}
+            onClick={() => path && onOpenNote(path)}
+            tabIndex={path ? 0 : -1}
+          >
+            <circle cx={node.x} cy={node.y} r={index === 0 ? 24 : 19} />
+            <text x={node.x} y={node.y + 4}>{node.id.slice(0, 10)}</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
-function findFirstNote(nodes: VaultNode[]): VaultNode | null {
-  for (const node of nodes) {
-    if (node.type === "file") return node;
-    const child = findFirstNote(node.children || []);
-    if (child) return child;
-  }
-  return null;
-}
+function Tree({
+  nodes,
+  activePath,
+  onOpenNote,
+  onMove,
+  onDelete
+}: {
+  nodes: VaultNode[];
+  activePath: string;
+  onOpenNote: (path: string) => void;
+  onMove: (path: string) => void;
+  onDelete: (path: string, name: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-function flattenNotes(nodes: VaultNode[]): VaultNode[] {
-  return nodes.flatMap((node) => node.type === "file" ? [node] : flattenNotes(node.children || []));
+  if (!nodes.length) return <div className="empty-state">Vault 为空，点击新建笔记开始。</div>;
+  return (
+    <>
+      {nodes.map((node) => {
+        const isCollapsed = Boolean(collapsed[node.path]);
+        return (
+          <div className="tree-group" key={node.path}>
+            {node.type === "directory" ? (
+              <>
+                <div className="tree-node-line">
+                  <button
+                    className="tree-folder"
+                    aria-expanded={!isCollapsed}
+                    onClick={() => setCollapsed((current) => ({ ...current, [node.path]: !current[node.path] }))}
+                  >
+                    <ChevronDown size={14} className={isCollapsed ? "chevron-collapsed" : ""} /> {node.name}
+                  </button>
+                  <button className="tree-action" aria-label="移动文件夹" onClick={() => onMove(node.path)}><MoveRight size={13} /></button>
+                  <button className="tree-action danger" aria-label="删除文件夹" onClick={() => onDelete(node.path, node.name)}><Trash2 size={13} /></button>
+                </div>
+                {!isCollapsed && (
+                  <div className="tree-children">
+                    <Tree nodes={node.children || []} activePath={activePath} onOpenNote={onOpenNote} onMove={onMove} onDelete={onDelete} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="tree-node-line">
+                <button className={`tree-file ${node.path === activePath ? "selected" : ""}`} onClick={() => onOpenNote(node.path)}>
+                  <BookOpen size={15} />
+                  <span>{node.name.replace(/\.md$/, "")}</span>
+                </button>
+                <button className="tree-action" aria-label="移动笔记" onClick={() => onMove(node.path)}><MoveRight size={13} /></button>
+                <button className="tree-action danger" aria-label="删除笔记" onClick={() => onDelete(node.path, node.name)}><Trash2 size={13} /></button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

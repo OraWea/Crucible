@@ -50,10 +50,18 @@ class DBManager:
                         source_note_path TEXT NOT NULL,
                         asr_engine TEXT,
                         vlm_model TEXT,
+                        metadata_json TEXT DEFAULT '{}',
+                        keyframes_json TEXT DEFAULT '[]',
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
                 """)
+                cursor.execute("PRAGMA table_info(sources)")
+                source_columns = {row["name"] for row in cursor.fetchall()}
+                if "metadata_json" not in source_columns:
+                    cursor.execute("ALTER TABLE sources ADD COLUMN metadata_json TEXT DEFAULT '{}'")
+                if "keyframes_json" not in source_columns:
+                    cursor.execute("ALTER TABLE sources ADD COLUMN keyframes_json TEXT DEFAULT '[]'")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS segments (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,

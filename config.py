@@ -103,6 +103,7 @@ class Config:
     # 覆盖与安全设定
     ENABLE_BACKUP = True # 覆写旧笔记前是否创建本地备份备份
     BACKUP_DIR = os.path.join(BASE_DIR, 'data', 'backups')
+    TRASH_DIR = os.path.join(BACKUP_DIR, 'trash')
 
     @staticmethod
     def has_valid_api_key(api_key: str = None) -> bool:
@@ -120,6 +121,7 @@ class Config:
         os.makedirs(os.path.dirname(Config.LOCAL_SETTINGS_PATH), exist_ok=True)
         os.makedirs(Config.TEMP_DIR, exist_ok=True)
         os.makedirs(Config.BACKUP_DIR, exist_ok=True)
+        os.makedirs(Config.TRASH_DIR, exist_ok=True)
 
     @staticmethod
     def update_llm_runtime(
@@ -179,9 +181,16 @@ class Config:
         vlm_model: str,
         fact_model: str,
         api_key: str = None,
+        whisper_model: str = None,
+        whisper_device: str = None,
     ):
         """保存 GUI 中的模型配置到本地配置文件。"""
         os.makedirs(os.path.dirname(Config.LOCAL_SETTINGS_PATH), exist_ok=True)
+        if whisper_model is not None:
+            Config.WHISPER_MODEL_NAME = whisper_model
+        if whisper_device is not None:
+            Config.WHISPER_DEVICE = whisper_device
+
         settings = {
             "provider": provider,
             "api_base": api_base,

@@ -9,6 +9,7 @@ from Crucible.config import Config
 from Crucible.models.api_client import OpenAICompatibleClient
 from Crucible.utils.fs_router import FSRouter
 from Crucible.utils.graph_builder import KnowledgeGraphBuilder
+from Crucible.utils.source_index import SourceIndex
 from Crucible.utils.source_index import format_timestamp, source_timestamp_link
 from Crucible.utils.wiki_editor import wiki_editor
 
@@ -93,6 +94,62 @@ class TestCoreFeatures(unittest.TestCase):
 
         self.assertIn("crucible://note/", html)
         self.assertIn("Alias", html)
+
+    def test_markdown_preview_escapes_raw_html(self):
+        html = wiki_editor.render_markdown_preview('<img src=x onerror="alert(1)"><script>alert(2)</script>')
+
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("<img", html)
+        self.assertNotIn(' onerror="', html)
+        self.assertIn("&lt;script&gt;", html)
+
+    def test_fs_router_trash_and_restore_path(self):
+        old_trash_dir = Config.TRASH_DIR
+        old_backup_dir = Config.BACKUP_DIR
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                Config.BACKUP_DIR = os.path.join(tmp_dir, "backups")
+                Config.TRASH_DIR = os.path.join(Config.BACKUP_DIR, "trash")
+                os.makedirs(Config.TRASH_DIR, exist_ok=True)
+                router = FSRouter(vault_path=os.path.join(tmp_dir, "vault"))
+                note_path = router.create_note(router.vault_path, "Demo.md", "# Demo")
+
+                manifest = router.trash_path(note_path, "Demo.md")
+                self.assertFalse(os.path.exists(note_path))
+                self.assertEqual(manifest["original_path"], "Demo.md")
+
+                restored = router.restore_trash(manifest["id"])
+                self.assertTrue(os.path.exists(os.path.join(router.vault_path, restored["restored_path"])))
+        finally:
+            Config.TRASH_DIR = old_trash_dir
+            Config.BACKUP_DIR = old_backup_dir
+
+    def test_source_index_json_detail_fields(self):
+        import Crucible.utils.source_index as source_index_module
+
+        old_db_manager = source_index_module.db_manager
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                db_path = os.path.join(tmp_dir, "test.db")
+                from Crucible.utils.db_manager import DBManager
+
+                source_index_module.db_manager = DBManager(db_path)
+                index = SourceIndex()
+                source = index.upsert_source(
+                    source_name="Demo.mp4",
+                    source_type="video",
+                    source_uri="Demo.mp4",
+                    source_hash="hash-demo",
+                    duration=12,
+                    metadata={"resolution": "1920x1080"},
+                    keyframes=[{"filename": "00-00-01.jpg", "timestamp_label": "00:00:01"}],
+                )
+                detail = index.get_source_detail(source["id"])
+
+                self.assertEqual(detail["metadata"]["resolution"], "1920x1080")
+                self.assertEqual(detail["keyframes"][0]["filename"], "00-00-01.jpg")
+        finally:
+            source_index_module.db_manager = old_db_manager
 
 
 if __name__ == "__main__":

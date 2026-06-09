@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QFileDialog, QHeaderView, QTableWidget, QTableWidgetItem, QFrame,
     QInputDialog, QTextBrowser
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDir, QUrl
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QDir, QUrl, QTimer
 from PyQt6.QtGui import QFont, QFileSystemModel, QIcon, QTextCursor
 
 # 载入配置及工具类
@@ -641,6 +641,11 @@ class MainWindow(QMainWindow):
         # -------------------------------------------------------------
         # 全局信号绑定
         # -------------------------------------------------------------
+        self.preview_refresh_timer = QTimer(self)
+        self.preview_refresh_timer.setSingleShot(True)
+        self.preview_refresh_timer.setInterval(300)
+        self.preview_refresh_timer.timeout.connect(self.refresh_live_note_preview)
+
         self.btn_select_file.clicked.connect(self.select_files_manually)
         self.btn_weave.clicked.connect(self.start_ai_flow)
         self.tree_view.doubleClicked.connect(self.load_selected_note)
@@ -662,7 +667,7 @@ class MainWindow(QMainWindow):
         self.btn_refresh_preview.clicked.connect(self.refresh_note_context)
         self.preview_browser.anchorClicked.connect(self.open_preview_link)
         self.links_table.cellDoubleClicked.connect(self.open_link_table_item)
-        self.txt_editor.textChanged.connect(self.mark_note_dirty)
+        self.txt_editor.textChanged.connect(self.on_editor_text_changed)
 
         # 覆写窗口拖拽拖放事件
         self.upload_frame.dragEnterEvent = self.dragEnterEvent
@@ -1058,6 +1063,12 @@ class MainWindow(QMainWindow):
         self.refresh_properties_table(content)
         self.refresh_links_table()
 
+    def refresh_live_note_preview(self):
+        """编辑时轻量刷新预览和 frontmatter，不触发反链/索引扫描。"""
+        content = self.txt_editor.toPlainText()
+        self.preview_browser.setHtml(wiki_editor.render_markdown_preview(content))
+        self.refresh_properties_table(content)
+
     def refresh_properties_table(self, content: str):
         frontmatter = wiki_editor.read_frontmatter(content)
         self.properties_table.setRowCount(len(frontmatter))
@@ -1087,6 +1098,11 @@ class MainWindow(QMainWindow):
         if self.current_editing_path:
             self.note_dirty = True
             self.lbl_save_status.setText("未保存")
+
+    def on_editor_text_changed(self):
+        self.mark_note_dirty()
+        if self.current_editing_path:
+            self.preview_refresh_timer.start()
 
     def refresh_relation_graph(self):
         """刷新 Markdown 双链关系图谱"""
