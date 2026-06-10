@@ -5,6 +5,7 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  CircleHelp,
   CircleDot,
   Clock3,
   FilePlus2,
@@ -12,10 +13,8 @@ import {
   Folder,
   FolderOpen,
   GitFork,
-  Hash,
   Image as ImageIcon,
   Link2,
-  ListChecks,
   Loader2,
   LogOut,
   MoreHorizontal,
@@ -26,12 +25,12 @@ import {
   Save,
   Search,
   Settings2,
-  ShieldAlert,
   Sparkles,
   Trash2,
   UploadCloud,
   UserPlus,
-  Video
+  Video,
+  X
 } from "lucide-react";
 import "./styles.css";
 import type {
@@ -62,6 +61,7 @@ import {
 } from "./utils";
 
 const TOKEN_KEY = "crucible_web_token";
+const GUIDE_DISMISSED_KEY = "crucible_usage_guide_dismissed";
 const DEFAULT_TEMPLATES = ["空白"];
 const DEFAULT_ASR_OPTIONS = {
   whisper_lang: "auto",
@@ -69,17 +69,63 @@ const DEFAULT_ASR_OPTIONS = {
 };
 
 const navItems = [
-  { label: "Vault", icon: FolderOpen },
+  { label: "笔记", icon: FolderOpen },
   { label: "来源", icon: Video },
   { label: "检索", icon: Search },
   { label: "图谱", icon: GitFork },
   { label: "设置", icon: Settings2 }
 ];
 
+const guideSteps = [
+  {
+    title: "配置模型",
+    detail: "Provider、API Base、模型名和 API Key 集中在设置里；离线场景先用 Local Whisper。",
+    action: "打开设置",
+    target: "settings",
+    icon: Settings2,
+    tone: "blue"
+  },
+  {
+    title: "导入来源",
+    detail: "上传视频、音频、PDF/TXT，或粘贴可下载的视频 URL 建立处理任务。",
+    action: "导入文件",
+    target: "import",
+    icon: UploadCloud,
+    tone: "orange"
+  },
+  {
+    title: "核对片段",
+    detail: "来源页会显示转写片段、时间戳、关键帧和当前处理任务。",
+    action: "去来源",
+    target: "sources",
+    icon: Video,
+    tone: "green"
+  },
+  {
+    title: "沉淀笔记",
+    detail: "在笔记页编辑 Markdown；保存后反链、检索和图谱会同步刷新。",
+    action: "打开笔记",
+    target: "vault",
+    icon: BookOpen,
+    tone: "yellow"
+  }
+];
+
 function SourceIcon({ kind }: { kind: string }) {
   if (kind === "audio") return <AudioLines size={16} />;
   if (kind === "document") return <FileText size={16} />;
   return <Video size={16} />;
+}
+
+function jobSourceUris(job?: ProcessJob) {
+  const sources = job?.payload?.sources;
+  return Array.isArray(sources) ? sources.filter((item): item is string => typeof item === "string") : [];
+}
+
+function sourceKindLabel(kind: string) {
+  if (kind === "audio") return "音频";
+  if (kind === "document") return "文档";
+  return "视频";
 }
 
 function App() {
@@ -90,7 +136,8 @@ function App() {
   const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [activeNav, setActiveNav] = useState("Vault");
+  const [activeNav, setActiveNav] = useState("笔记");
+  const [guideOpen, setGuideOpen] = useState(() => localStorage.getItem(GUIDE_DISMISSED_KEY) !== "1");
 
   const [tree, setTree] = useState<VaultNode[]>([]);
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
@@ -184,7 +231,7 @@ function App() {
     setMessage(error instanceof Error ? error.message : String(error));
   }, []);
 
-  const openNote = useCallback(async (path: string, anchor = "") => {
+  const openNote = useCallback(async (path: string, anchor = "", switchToNotes = true) => {
     try {
       const suffix = anchor ? `?anchor=${encodeURIComponent(anchor)}` : "";
       const loaded = await api<NotePayload>(`/api/notes/${encodeURIComponent(path).replace(/%2F/g, "/")}${suffix}`);
@@ -196,7 +243,7 @@ function App() {
       setNewItemParent(parentPathOf(loaded.path));
       if (anchor) setEditorMode("preview");
       setDirty(false);
-      setActiveNav("Vault");
+      if (switchToNotes) setActiveNav("笔记");
     } catch (error) {
       showError(error);
     }
@@ -206,17 +253,20 @@ function App() {
     const data = await api<{ nodes: VaultNode[] }>("/api/vault/tree");
     setTree(data.nodes);
     const firstNote = findFirstNote(data.nodes);
-    if (!note && firstNote) await openNote(firstNote.path);
+    if (!note && firstNote) await openNote(firstNote.path, "", false);
   }, [api, note, openNote]);
 
-  const refreshSources = useCallback(async () => {
+  const refreshSources = useCallback(async (preferredUris: string[] = []) => {
     const data = await api<{ sources: SourceRecord[] }>("/api/sources");
     setSources(data.sources);
     setActiveSource((current) => {
       if (!data.sources.length) return null;
+      const preferred = data.sources.find((source) => preferredUris.includes(source.source_uri));
+      if (preferred) return preferred;
       if (!current) return data.sources[0];
       return data.sources.find((source) => source.id === current.id) || data.sources[0];
     });
+    return data.sources;
   }, [api]);
 
   const refreshGraph = useCallback(async () => {
@@ -248,8 +298,8 @@ function App() {
     setTrashItems(data.items);
   }, [api]);
 
-  const refreshKnowledgeState = useCallback(async () => {
-    await Promise.all([refreshVault(), refreshSources(), refreshGraph(), refreshLogs(), refreshTrash()]);
+  const refreshKnowledgeState = useCallback(async (preferredSourceUris: string[] = []) => {
+    await Promise.all([refreshVault(), refreshSources(preferredSourceUris), refreshGraph(), refreshLogs(), refreshTrash()]);
   }, [refreshVault, refreshSources, refreshGraph, refreshLogs, refreshTrash]);
 
   const refreshAll = useCallback(async () => {
@@ -425,7 +475,7 @@ function App() {
     if (!completedJob) return;
 
     if (completedJob.status === "succeeded") {
-      refreshKnowledgeState()
+      refreshKnowledgeState(jobSourceUris(completedJob))
         .then(() => setMessage("处理任务已完成，知识库状态已刷新"))
         .catch(showError);
     } else {
@@ -525,6 +575,7 @@ function App() {
   const directoryOptions = useMemo(() => [{ path: "", label: "data/vault" }, ...flattenDirectories(tree)], [tree]);
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0];
   const currentSourceKind = sourceKind(activeSource?.source_type);
+  const currentSourceLabel = currentSourceKind === "audio" ? "音频" : currentSourceKind === "document" ? "文档" : "视频";
   const filteredSegments = useMemo(() => {
     const needle = sourceFilter.trim().toLowerCase();
     if (!needle) return segments;
@@ -535,6 +586,17 @@ function App() {
   }, [segments, sourceFilter]);
   const activeSegments = filteredSegments;
   const sourceMetadata = sourceDetail?.metadata || {};
+  const frontmatterTimestamps = note?.frontmatter?.source_timestamps;
+  const frontmatterTimestampCount = Array.isArray(frontmatterTimestamps)
+    ? frontmatterTimestamps.length
+    : typeof frontmatterTimestamps === "string" && frontmatterTimestamps.trim()
+      ? frontmatterTimestamps.split(",").filter(Boolean).length
+      : 0;
+  const traceCount = Math.max(
+    note?.source_mentions.length || 0,
+    frontmatterTimestampCount,
+    note?.path === activeSource?.source_note_path ? segments.length : 0,
+  );
   const processPayload = useCallback((sourcesToProcess: string[]) => ({
     sources: sourcesToProcess,
     whisper_lang: asrOptions.whisper_lang,
@@ -659,7 +721,7 @@ function App() {
       setNewItemParent(parentPathOf(loaded.path));
       if (loaded.anchor) setEditorMode("preview");
       setDirty(false);
-      setActiveNav("Vault");
+      setActiveNav("笔记");
     } catch (error) {
       showError(error);
     }
@@ -893,6 +955,27 @@ function App() {
     }
   };
 
+  const dismissGuide = () => {
+    localStorage.setItem(GUIDE_DISMISSED_KEY, "1");
+    setGuideOpen(false);
+  };
+
+  const runGuideAction = (target: string) => {
+    if (target === "settings") {
+      setActiveNav("设置");
+      return;
+    }
+    if (target === "import") {
+      fileInputRef.current?.click();
+      return;
+    }
+    if (target === "sources") {
+      setActiveNav("来源");
+      return;
+    }
+    setActiveNav("笔记");
+  };
+
   if (!user) {
     return (
       <main className="login-shell">
@@ -932,13 +1015,496 @@ function App() {
     );
   }
 
+  const guidePanel = guideOpen ? (
+    <section id="usage-guide" className="guide-panel sketch-card" aria-label="使用引导">
+      <div className="guide-header">
+        <div>
+          <p className="eyebrow">使用引导</p>
+          <h2>从来源到笔记</h2>
+        </div>
+        <button className="icon-chip" aria-label="关闭使用引导" onClick={dismissGuide}>
+          <X size={18} />
+        </button>
+      </div>
+      <div className="guide-steps">
+        {guideSteps.map((step, index) => {
+          const Icon = step.icon;
+          return (
+            <button
+              key={step.title}
+              className={`guide-step tone-${step.tone}`}
+              aria-label={`引导：${step.title}`}
+              onClick={() => runGuideAction(step.target)}
+            >
+              <span className="guide-step-index">{index + 1}</span>
+              <Icon size={19} />
+              <strong>{step.title}</strong>
+              <small>{step.detail}</small>
+              <em>{step.action}</em>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  ) : null;
+
+  const editorPanel = (
+    <article className="editor-pane sketch-card">
+      <div className="editor-tabs">
+        <button className={`paper-tab ${editorMode === "edit" ? "active" : ""}`} onClick={() => setEditorMode("edit")}>编辑</button>
+        <button className={`paper-tab ${editorMode === "preview" ? "active" : ""}`} onClick={() => setEditorMode("preview")} disabled={!note}>预览</button>
+        <button className="paper-tab" onClick={openOrganizationRules}>整理规则</button>
+        <button className="paper-tab" onClick={renameCurrentNote} disabled={!note}>重命名</button>
+        <button className="paper-tab" onClick={saveNote} disabled={!note || !dirty}><Save size={15} /> 保存</button>
+        <button className="tab-more" aria-label="刷新" onClick={refreshAll}><MoreHorizontal size={18} /></button>
+      </div>
+
+      <div className="note-header">
+        <p className="eyebrow">{note?.path || "未打开笔记"}</p>
+        <h2>{note ? note.name.replace(/\.md$/, "") : "选择或新建一个 Markdown 笔记"}</h2>
+        <div className="tag-row">
+          {note ? displayTags(note.tags).map((tag) => <span key={tag}>#{tag.replace(/^#/, "")}</span>) : <span>#空</span>}
+          {dirty && <span>#未保存</span>}
+        </div>
+      </div>
+
+      {editorMode === "edit" ? (
+        <textarea
+          ref={editorRef}
+          className="markdown-editor"
+          value={editorContent}
+          onChange={(event) => {
+            setEditorContent(event.target.value);
+            setDirty(true);
+          }}
+          placeholder="打开或创建笔记后开始编辑..."
+        />
+      ) : (
+        <div className="preview-shell">
+          <div className="preview-status">
+            <span>{previewPending ? "正在渲染" : dirty ? "未保存预览" : "已保存预览"}</span>
+          </div>
+          <div
+            ref={previewRef}
+            className="markdown-preview"
+            onClick={handlePreviewClick}
+            dangerouslySetInnerHTML={{ __html: previewHtml || "<p>暂无可预览内容。</p>" }}
+          />
+        </div>
+      )}
+    </article>
+  );
+
+  const sourceDetailPanel = (
+    <article className="source-pane sketch-card">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">当前来源</p>
+          <h2>{activeSource?.source_name || "暂无来源"}</h2>
+        </div>
+        <button className="icon-chip" aria-label="打开来源页" onClick={() => activeSource && openNote(activeSource.source_note_path)} disabled={!activeSource}>
+          <Play size={18} />
+        </button>
+      </div>
+
+      <div className="source-stage">
+        <div className={`source-badge ${currentSourceKind}`}>
+          <SourceIcon kind={currentSourceKind} />
+          <span>{currentSourceLabel}</span>
+        </div>
+        <div className="progress-block">
+          <div className="progress-meta">
+            <strong>{activeSource ? "已入库" : "等待导入"}</strong>
+            <span>{activeSource ? "100%" : "0%"}</span>
+          </div>
+          <div className="pencil-progress">
+            <span style={{ width: activeSource ? "100%" : "0%" }} />
+          </div>
+          <p>{activeSource ? `${activeSource.source_note_path} · ${formatDuration(activeSource.duration)}` : "导入来源后这里显示片段和时间戳。"}</p>
+        </div>
+      </div>
+
+      {activeSource && (
+        <div className="source-meta-grid">
+          <span><strong>Hash</strong>{displayMeta(activeSource.source_hash)}</span>
+          <span><strong>分辨率</strong>{displayMeta(sourceMetadata.resolution)}</span>
+          <span><strong>FPS</strong>{displayMeta(sourceMetadata.fps)}</span>
+          <span><strong>音轨</strong>{displayMeta(sourceMetadata.audio_streams)}</span>
+          <span><strong>字幕</strong>{displayMeta(sourceMetadata.subtitle_streams)}</span>
+          <span><strong>大小</strong>{sourceMetadata.file_size ? `${Math.round(Number(sourceMetadata.file_size) / 1024 / 1024 * 10) / 10} MB` : "未知"}</span>
+        </div>
+      )}
+
+      {sourceDetail?.keyframes.length ? (
+        <div className="keyframe-strip">
+          {sourceDetail.keyframes.map((frame) => (
+            <button
+              className="keyframe-card"
+              key={`${frame.filename}-${frame.timestamp_label}`}
+              onClick={() => activeSource && openNote(activeSource.source_note_path, frame.timestamp_label)}
+            >
+              {keyframeUrls[frame.filename] ? (
+                <img src={keyframeUrls[frame.filename]} alt={frame.timestamp_label} />
+              ) : (
+                <span className="keyframe-placeholder"><ImageIcon size={18} /></span>
+              )}
+              <strong>{frame.timestamp_label}</strong>
+              <small>{frame.description || frame.ocr || "关键帧"}</small>
+            </button>
+          ))}
+        </div>
+      ) : activeSource && currentSourceKind === "video" ? (
+        <div className="empty-state">暂无关键帧。重新处理本地视频后会保存画面信息。</div>
+      ) : null}
+
+      <label className="inline-filter">
+        <Search size={15} />
+        <input value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} placeholder="筛选片段或时间戳" />
+      </label>
+
+      <div className="segment-list scroll-list">
+        {activeSegments.length > 0 ? activeSegments.map((segment, index) => (
+          <button
+            className={`segment-row tone-${["blue", "yellow", "green"][index % 3]}`}
+            key={segment.id}
+            onClick={() => activeSource && openNote(activeSource.source_note_path, segment.timestamp_label)}
+          >
+            <Clock3 size={15} />
+            <time>{segment.timestamp_label}</time>
+            <span>{segment.text || "空片段"}</span>
+            <small>{activeSource ? `[[${activeSource.source_note_path.replace(/\.md$/, "")}#${segment.timestamp_label}|${segment.timestamp_label}]]` : ""}</small>
+          </button>
+        )) : (
+          <div className="empty-state">暂无片段。处理来源后这里会显示可追溯时间戳。</div>
+        )}
+      </div>
+    </article>
+  );
+
+  const sourceImportPanel = (
+    <article className="source-import-card sketch-card">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">导入</p>
+          <h2>添加来源</h2>
+        </div>
+        <button className="marker-button primary" onClick={processCurrentSource} disabled={!activeSource}>
+          <Sparkles size={17} />
+          提炼当前来源
+        </button>
+      </div>
+      <div className="source-actions">
+        <button className="marker-button" onClick={() => fileInputRef.current?.click()}>
+          <UploadCloud size={17} />
+          上传文件
+        </button>
+        <label className="url-add-box">
+          <Link2 size={16} />
+          <input
+            aria-label="添加来源链接"
+            placeholder="粘贴视频或网页 URL..."
+            value={urlInput}
+            onChange={(event) => {
+              setUrlInput(event.target.value);
+              if (urlStatus) setUrlStatus("");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") addUrlAndProcess();
+            }}
+          />
+        </label>
+        <button className="marker-button" onClick={addUrlAndProcess}>
+          <Link2 size={17} />
+          添加链接
+        </button>
+      </div>
+    </article>
+  );
+
+  const recentSourcesPanel = (
+    <article className="queue-card sketch-card">
+      <div className="section-title compact">
+        <h3>来源库</h3>
+        <span>{sources.length} 个</span>
+      </div>
+      <div className="queue-list">
+        {sources.length > 0 ? sources.slice(0, 10).map((source) => (
+          <button className={source.id === activeSource?.id ? "queue-item active" : "queue-item"} key={source.id} onClick={() => setActiveSource(source)}>
+            <SourceIcon kind={sourceKind(source.source_type)} />
+            <span>{source.source_name}</span>
+            <small>{sourceKindLabel(sourceKind(source.source_type))}</small>
+          </button>
+        )) : <div className="empty-state">暂无来源。</div>}
+      </div>
+    </article>
+  );
+
+  const jobsPanel = (
+    <article className="queue-card sketch-card">
+      <div className="section-title compact">
+        <h3>处理任务</h3>
+        <span>{jobs.length} 个</span>
+      </div>
+      <div className="task-list">
+        {jobs.slice(0, 6).map((job) => (
+          <button className={job.id === activeJob?.id ? "job-row active" : "job-row"} key={job.id} onClick={() => setActiveJobId(job.id)}>
+            <span>{job.status}</span>
+            <strong>{job.progress}%</strong>
+          </button>
+        ))}
+        {activeJob ? (
+          <div className="job-detail">
+            <p><strong>{activeJob.id.slice(0, 10)}</strong> · {activeJob.status}</p>
+            {activeJob.result && <p>来源 {activeJob.result.processed_sources} · 笔记 {activeJob.result.written_notes}</p>}
+            {activeJob.error && <p className="error-text">{activeJob.error}</p>}
+            {activeJob.status === "failed" && <button className="tiny-button" onClick={() => retryJob(activeJob.id)}>重试</button>}
+            <div className="job-log-list">
+              {activeJob.logs.map((log) => (
+                <label key={`${log.time}-${log.message}`}><CircleDot size={15} /><span>{log.time} · {log.message}</span></label>
+              ))}
+            </div>
+          </div>
+        ) : <span className="muted-text">暂无处理任务</span>}
+      </div>
+    </article>
+  );
+
+  const recentNotesPanel = (
+    <article className="queue-card sketch-card">
+      <div className="section-title compact">
+        <h3>最近笔记</h3>
+        <span>{recentNotes.length} 篇</span>
+      </div>
+      <div className="note-list">
+        {recentNotes.map((item) => (
+          <button className={item.path === note?.path ? "note-row active" : "note-row"} key={item.path} onClick={() => openNote(item.path)}>
+            <FileText size={15} />
+            <span>{item.name.replace(/\.md$/, "")}</span>
+            <small>md</small>
+          </button>
+        ))}
+        {!recentNotes.length && <div className="empty-state">暂无笔记。</div>}
+      </div>
+    </article>
+  );
+
+  const noteSupportPanel = (
+    <article className="queue-card sketch-card">
+      <div className="section-title compact">
+        <h3>反链与回收站</h3>
+        <span>{(note?.backlinks.length || 0) + trashItems.length} 条</span>
+      </div>
+      <div className="task-list">
+        {note?.backlinks.length ? note.backlinks.slice(0, 5).map((link) => (
+          <button className="note-row" key={`${link.path}-${link.label}`} onClick={() => openNote(link.path)}>
+            <Link2 size={15} />
+            <span>{link.source}</span>
+            <small>反链</small>
+          </button>
+        )) : <span className="muted-text">暂无反链</span>}
+        {trashItems.slice(0, 5).map((item) => (
+          <button className="trash-row" key={item.id} onClick={() => restoreTrashItem(item.id)}>
+            <RotateCcw size={15} />
+            <span>{item.name}</span>
+            <small>{item.original_path}</small>
+          </button>
+        ))}
+      </div>
+    </article>
+  );
+
+  const searchPanel = (
+    <article className="page-card sketch-card">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">检索</p>
+          <h2>搜索来源与概念</h2>
+        </div>
+        <span className="count-badge">{searchResults.length} 条结果</span>
+      </div>
+      <label className="search-box page-search">
+        <Search size={18} />
+        <input
+          placeholder="输入关键词后按 Enter..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") runSearch();
+          }}
+        />
+      </label>
+      <div className="note-list search-results">
+        {searchResults.map((result, index) => (
+          <button className="note-row" key={`${result.source_note_path}-${result.timestamp_label}-${index}`} onClick={() => openSearchResult(result)}>
+            <Search size={15} />
+            <span>{result.source_name} · {result.timestamp_label}<em>{result.text}</em></span>
+            <small>{result.concepts || "匹配"}</small>
+          </button>
+        ))}
+        {!searchResults.length && <div className="empty-state">暂无结果。</div>}
+      </div>
+    </article>
+  );
+
+  const graphPanel = (
+    <article className="page-card sketch-card">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">图谱</p>
+          <h2>知识关系</h2>
+        </div>
+        <span className="count-badge">{graph.edges.length} 条关系</span>
+      </div>
+      <div className="graph-workbench graph-workbench-wide">
+        <GraphView graph={graph} currentPath={note?.path || ""} onOpenNote={openNote} />
+        <div className="note-list scroll-list compact-list">
+          {graph.edges.map((edge, index) => (
+            <button className="note-row" key={`${edge.source}-${edge.target}-${index}`} onClick={() => openNote(edge.source_path, edge.timestamp)}>
+              <GitFork size={15} />
+              <span>{edge.source} {"->"} {edge.target}</span>
+              <small>{edge.type}</small>
+            </button>
+          ))}
+          {!graph.edges.length && <div className="empty-state">暂无关系。</div>}
+        </div>
+      </div>
+      {graphSummary && <pre className="graph-summary graph-summary-wide">{graphSummary}</pre>}
+    </article>
+  );
+
+  const settingsPanel = (
+    <article className="page-card sketch-card">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">设置</p>
+          <h2>模型与转写</h2>
+        </div>
+        <div className="settings-actions inline-actions">
+          <button className="marker-button" onClick={testSettings}>测试配置</button>
+          <button className="marker-button primary" onClick={saveSettings}>保存配置</button>
+        </div>
+      </div>
+      <div className="settings-form settings-form-wide">
+        <label>
+          <span>Provider</span>
+          <select value={settings.provider} onChange={(event) => selectProvider(event.target.value)}>
+            {providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>API Base</span>
+          <input value={settings.api_base} onChange={(event) => setSettings({ ...settings, api_base: event.target.value })} placeholder="API Base" />
+        </label>
+        <label>
+          <span>LLM 模型</span>
+          <input value={settings.llm_model} onChange={(event) => setSettings({ ...settings, llm_model: event.target.value })} placeholder="例如 qwen-plus" />
+        </label>
+        <label>
+          <span>VLM 模型</span>
+          <input value={settings.vlm_model} onChange={(event) => setSettings({ ...settings, vlm_model: event.target.value })} placeholder="例如 qwen-vl-plus" />
+        </label>
+        <label>
+          <span>事实核查模型</span>
+          <input value={settings.fact_model} onChange={(event) => setSettings({ ...settings, fact_model: event.target.value })} placeholder="例如 qwen-plus" />
+        </label>
+        <label>
+          <span>Whisper 模型</span>
+          <input value={settings.whisper_model} onChange={(event) => setSettings({ ...settings, whisper_model: event.target.value })} placeholder="例如 base" />
+        </label>
+        <label>
+          <span>Whisper 设备</span>
+          <select value={settings.whisper_device} onChange={(event) => setSettings({ ...settings, whisper_device: event.target.value })}>
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA</option>
+          </select>
+        </label>
+        <label>
+          <span>API Key</span>
+          <input type="password" value={settings.api_key} onChange={(event) => setSettings({ ...settings, api_key: event.target.value })} placeholder="不会明文展示已保存密钥" />
+        </label>
+        <label>
+          <span>ASR 引擎</span>
+          <select value={asrOptions.asr_engine} onChange={(event) => setAsrOptions({ ...asrOptions, asr_engine: event.target.value })}>
+            <option value="dashscope">DashScope</option>
+            <option value="local">Local Whisper</option>
+          </select>
+        </label>
+        <label>
+          <span>转写语言</span>
+          <select value={asrOptions.whisper_lang} onChange={(event) => setAsrOptions({ ...asrOptions, whisper_lang: event.target.value })}>
+            <option value="auto">Auto</option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </label>
+      </div>
+      {settingsStatus && (
+        <p className={settingsStatus.ok ? "settings-status ok" : "settings-status error"}>
+          {settingsStatus.message} · {settingsStatus.status || "local"}
+        </p>
+      )}
+    </article>
+  );
+
+  const adminLogPanel = user.role === "admin" ? (
+    <article className="queue-card sketch-card">
+      <div className="section-title compact">
+        <h3>系统日志</h3>
+        <button className="tiny-button" onClick={exportLogs}>导出</button>
+      </div>
+      <div className="admin-log-list">
+        {logs.slice(0, 8).map((log, index) => (
+          <p key={index}><strong>{String(log.action || "")}</strong> {String(log.detail || "")}</p>
+        ))}
+      </div>
+    </article>
+  ) : null;
+
+  let mainContent: React.ReactNode;
+  if (activeNav === "来源") {
+    mainContent = (
+      <section className="page-stack">
+        {sourceImportPanel}
+        <section className="source-page-grid">
+          {sourceDetailPanel}
+          <div className="page-side">
+            {recentSourcesPanel}
+            {jobsPanel}
+          </div>
+        </section>
+      </section>
+    );
+  } else if (activeNav === "检索") {
+    mainContent = searchPanel;
+  } else if (activeNav === "图谱") {
+    mainContent = graphPanel;
+  } else if (activeNav === "设置") {
+    mainContent = (
+      <section className="page-stack">
+        {settingsPanel}
+        {adminLogPanel}
+      </section>
+    );
+  } else {
+    mainContent = (
+      <section className="page-stack">
+        {editorPanel}
+        <section className="bottom-shelf compact-shelf">
+          {recentNotesPanel}
+          {noteSupportPanel}
+        </section>
+      </section>
+    );
+  }
+
   return (
-    <main className="workspace-shell">
+    <main className="workspace-shell simple-shell">
       <aside className="left-rail sketch-panel">
         <div className="brand-mark">
           <span className="brand-sigil">C</span>
           <div>
-            <p className="eyebrow">Video-first KB</p>
+            <p className="eyebrow">视频知识库</p>
             <h1>Crucible</h1>
           </div>
         </div>
@@ -987,6 +1553,14 @@ function App() {
       </aside>
 
       <section className="main-workspace">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          hidden
+          accept=".mp4,.mkv,.avi,.mov,.webm,.mp3,.wav,.m4a,.flac,.aac,.pdf,.txt,.md"
+          onChange={(event) => uploadAndProcess(event.target.files)}
+        />
         <header className="command-bar sketch-card">
           <label className="search-box">
             <Search size={18} />
@@ -1000,373 +1574,61 @@ function App() {
             />
           </label>
           <div className="command-actions">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              hidden
-              accept=".mp4,.mkv,.avi,.mov,.webm,.mp3,.wav,.m4a,.flac,.aac,.pdf,.txt,.md"
-              onChange={(event) => uploadAndProcess(event.target.files)}
-            />
+            <button className="marker-button" onClick={runSearch}>
+              <Search size={17} />
+              搜索
+            </button>
             <button className="marker-button" onClick={() => fileInputRef.current?.click()}>
               <UploadCloud size={17} />
               导入来源
             </button>
-            <label className="url-add-box">
-              <Link2 size={16} />
-              <input
-                aria-label="添加来源链接"
-                placeholder="粘贴视频或网页 URL..."
-                value={urlInput}
-                onChange={(event) => {
-                  setUrlInput(event.target.value);
-                  if (urlStatus) setUrlStatus("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addUrlAndProcess();
-                }}
-              />
-            </label>
-            <button className="marker-button" onClick={addUrlAndProcess}>
-              <Link2 size={17} />
-              添加链接
+            <button className="marker-button" onClick={refreshAll}>
+              <RotateCcw size={17} />
+              刷新
             </button>
-            <button className="marker-button primary" onClick={processCurrentSource} disabled={!activeSource}>
-              <Sparkles size={17} />
-              提炼当前来源
+            <button
+              className="marker-button guide-toggle"
+              aria-controls="usage-guide"
+              aria-expanded={guideOpen}
+              onClick={() => setGuideOpen((current) => !current)}
+            >
+              <CircleHelp size={17} />
+              使用引导
             </button>
           </div>
         </header>
 
+        {guidePanel}
         {urlStatus && <section className="url-feedback sketch-card">{urlStatus}</section>}
-
-        <section className="work-grid">
-          <article className="source-pane sketch-card">
-            <div className="section-title">
-              <div>
-                <p className="eyebrow">Active source</p>
-                <h2>{activeSource?.source_name || "暂无来源"}</h2>
-              </div>
-              <button className="icon-chip" aria-label="打开来源页" onClick={() => activeSource && openNote(activeSource.source_note_path)}>
-                <Play size={18} />
-              </button>
-            </div>
-
-            <div className="source-stage">
-              <div className={`source-badge ${currentSourceKind}`}>
-                <SourceIcon kind={currentSourceKind} />
-                <span>{currentSourceKind}</span>
-              </div>
-              <div className="progress-block">
-                <div className="progress-meta">
-                  <strong>{activeSource ? "已入库" : "等待导入"}</strong>
-                  <span>{activeSource ? "100%" : "0%"}</span>
-                </div>
-                <div className="pencil-progress">
-                  <span style={{ width: activeSource ? "100%" : "0%" }} />
-                </div>
-                <p>{activeSource ? `${activeSource.source_note_path} · ${formatDuration(activeSource.duration)}` : "上传视频、音频或文档后会生成来源页。"}</p>
-              </div>
-            </div>
-
-            {activeSource && (
-              <div className="source-meta-grid">
-                <span><strong>Hash</strong>{displayMeta(activeSource.source_hash)}</span>
-                <span><strong>分辨率</strong>{displayMeta(sourceMetadata.resolution)}</span>
-                <span><strong>FPS</strong>{displayMeta(sourceMetadata.fps)}</span>
-                <span><strong>音轨</strong>{displayMeta(sourceMetadata.audio_streams)}</span>
-                <span><strong>字幕</strong>{displayMeta(sourceMetadata.subtitle_streams)}</span>
-                <span><strong>大小</strong>{sourceMetadata.file_size ? `${Math.round(Number(sourceMetadata.file_size) / 1024 / 1024 * 10) / 10} MB` : "未知"}</span>
-              </div>
-            )}
-
-            {sourceDetail?.keyframes.length ? (
-              <div className="keyframe-strip">
-                {sourceDetail.keyframes.map((frame) => (
-                  <button
-                    className="keyframe-card"
-                    key={`${frame.filename}-${frame.timestamp_label}`}
-                    onClick={() => activeSource && openNote(activeSource.source_note_path, frame.timestamp_label)}
-                  >
-                    {keyframeUrls[frame.filename] ? (
-                      <img src={keyframeUrls[frame.filename]} alt={frame.timestamp_label} />
-                    ) : (
-                      <span className="keyframe-placeholder"><ImageIcon size={18} /></span>
-                    )}
-                    <strong>{frame.timestamp_label}</strong>
-                    <small>{frame.description || frame.ocr || "关键帧"}</small>
-                  </button>
-                ))}
-              </div>
-            ) : activeSource && currentSourceKind === "video" ? (
-              <div className="empty-state">暂无关键帧。重新处理本地视频后会保存抽帧 OCR 与画面描述。</div>
-            ) : null}
-
-            <label className="inline-filter">
-              <Search size={15} />
-              <input value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} placeholder="筛选片段或时间戳" />
-            </label>
-
-            <div className="segment-list scroll-list">
-              {activeSegments.length > 0 ? activeSegments.map((segment, index) => (
-                <button
-                  className={`segment-row tone-${["blue", "yellow", "green"][index % 3]}`}
-                  key={segment.id}
-                  onClick={() => activeSource && openNote(activeSource.source_note_path, segment.timestamp_label)}
-                >
-                  <Clock3 size={15} />
-                  <time>{segment.timestamp_label}</time>
-                  <span>{segment.text || "空片段"}</span>
-                  <small>{activeSource ? `[[${activeSource.source_note_path.replace(/\.md$/, "")}#${segment.timestamp_label}|${segment.timestamp_label}]]` : ""}</small>
-                </button>
-              )) : (
-                <div className="empty-state">暂无片段。处理来源后这里会显示可追溯时间戳。</div>
-              )}
-            </div>
-          </article>
-
-          <article className="editor-pane sketch-card">
-            <div className="editor-tabs">
-              <button className={`paper-tab ${editorMode === "edit" ? "active" : ""}`} onClick={() => setEditorMode("edit")}>编辑</button>
-              <button className={`paper-tab ${editorMode === "preview" ? "active" : ""}`} onClick={() => setEditorMode("preview")} disabled={!note}>预览</button>
-              <button className="paper-tab" onClick={openOrganizationRules}>整理规则</button>
-              <button className="paper-tab" onClick={renameCurrentNote} disabled={!note}>重命名</button>
-              <button className="paper-tab" onClick={saveNote} disabled={!note || !dirty}><Save size={15} /> 保存</button>
-              <button className="tab-more" aria-label="刷新" onClick={refreshAll}><MoreHorizontal size={18} /></button>
-            </div>
-
-            <div className="note-header">
-              <p className="eyebrow">{note?.path || "未打开笔记"}</p>
-              <h2>{note ? note.name.replace(/\.md$/, "") : "选择或新建一个 Markdown 笔记"}</h2>
-              <div className="tag-row">
-                {note ? displayTags(note.tags).map((tag) => <span key={tag}>#{tag.replace(/^#/, "")}</span>) : <span>#empty</span>}
-                {dirty && <span>#unsaved</span>}
-              </div>
-            </div>
-
-            {editorMode === "edit" ? (
-              <textarea
-                ref={editorRef}
-                className="markdown-editor"
-                value={editorContent}
-                onChange={(event) => {
-                  setEditorContent(event.target.value);
-                  setDirty(true);
-                }}
-                placeholder="打开或创建笔记后开始编辑..."
-              />
-            ) : (
-              <div className="preview-shell">
-                <div className="preview-status">
-                  <span>{previewPending ? "正在渲染" : dirty ? "未保存预览" : "已保存预览"}</span>
-                </div>
-                <div
-                  ref={previewRef}
-                  className="markdown-preview"
-                  onClick={handlePreviewClick}
-                  dangerouslySetInnerHTML={{ __html: previewHtml || "<p>暂无可预览内容。</p>" }}
-                />
-              </div>
-            )}
-          </article>
-        </section>
-
-        <section className="bottom-shelf">
-          <article className="queue-card sketch-card">
-            <div className="section-title compact">
-              <h3>最近来源</h3>
-              <span>{sources.length} items</span>
-            </div>
-            <div className="queue-list">
-              {sources.length > 0 ? sources.slice(0, 8).map((source) => (
-                <button className={source.id === activeSource?.id ? "queue-item active" : "queue-item"} key={source.id} onClick={() => setActiveSource(source)}>
-                  <SourceIcon kind={sourceKind(source.source_type)} />
-                  <span>{source.source_name}</span>
-                  <small>{source.source_type}</small>
-                </button>
-              )) : <div className="empty-state">暂无来源。先导入一个文件。</div>}
-            </div>
-          </article>
-
-          <article className="queue-card sketch-card">
-            <div className="section-title compact">
-              <h3>{activeNav === "检索" ? "检索结果" : activeNav === "图谱" ? "图谱边" : "最近笔记"}</h3>
-              <span>{activeNav === "检索" ? `${searchResults.length} hits` : activeNav === "图谱" ? `${graph.edges.length} edges` : `${recentNotes.length} notes`}</span>
-            </div>
-            {activeNav === "检索" ? (
-              <div className="note-list">
-                {searchResults.map((result, index) => (
-                  <button className="note-row" key={`${result.source_note_path}-${result.timestamp_label}-${index}`} onClick={() => openSearchResult(result)}>
-                    <Search size={15} />
-                    <span>{result.source_name} · {result.timestamp_label}<em>{result.text}</em></span>
-                    <small>{result.concepts || "match"}</small>
-                  </button>
-                ))}
-                {!searchResults.length && <div className="empty-state">输入关键词后按 Enter 检索来源片段、标题或概念。</div>}
-              </div>
-            ) : activeNav === "图谱" ? (
-              <div className="graph-workbench">
-                <GraphView graph={graph} currentPath={note?.path || ""} onOpenNote={openNote} />
-                <div className="note-list scroll-list compact-list">
-                {graph.edges.map((edge, index) => (
-                  <button className="note-row" key={`${edge.source}-${edge.target}-${index}`} onClick={() => openNote(edge.source_path, edge.timestamp)}>
-                    <GitFork size={15} />
-                    <span>{edge.source} {"->"} {edge.target}</span>
-                    <small>{edge.type}</small>
-                  </button>
-                ))}
-                </div>
-              </div>
-            ) : (
-              <div className="note-list">
-                {recentNotes.map((item) => (
-                  <button className={item.path === note?.path ? "note-row active" : "note-row"} key={item.path} onClick={() => openNote(item.path)}>
-                    <FileText size={15} />
-                    <span>{item.name.replace(/\.md$/, "")}</span>
-                    <small>md</small>
-                  </button>
-                ))}
-              </div>
-            )}
-          </article>
-        </section>
+        {mainContent}
       </section>
 
-      <aside className="context-panel sketch-panel">
+      <aside className="context-panel sketch-panel compact-context">
         <div className="panel-title">
-          <span><PanelRight size={16} /> 上下文</span>
+          <span><PanelRight size={16} /> 状态</span>
           <button aria-label="退出登录" onClick={logout}><LogOut size={16} /></button>
         </div>
 
         {message && <section className="context-card message-card">{message}</section>}
 
         <section className="context-card">
-          <p className="eyebrow">Properties</p>
+          <p className="eyebrow">当前</p>
           <dl>
             <div><dt>用户</dt><dd>{user.username} / {user.role}</dd></div>
-            <div><dt>路径</dt><dd>{note?.path || "-"}</dd></div>
-            <div><dt>追溯</dt><dd>{note?.source_mentions.length || 0} 个时间戳</dd></div>
+            <div><dt>页面</dt><dd>{activeNav}</dd></div>
+            <div><dt>笔记</dt><dd>{note?.path || "-"}</dd></div>
+            <div><dt>追溯</dt><dd>{traceCount} 个时间戳</dd></div>
           </dl>
         </section>
 
         <section className="context-card">
-          <p className="eyebrow">Backlinks</p>
-          <div className="backlink-list">
-            {note?.backlinks.length ? note.backlinks.map((link) => (
-              <button key={`${link.path}-${link.label}`} onClick={() => openNote(link.path)}><Link2 size={14} /> {link.source}</button>
-            )) : <span className="muted-text">暂无反链</span>}
-          </div>
+          <p className="eyebrow">来源</p>
+          <dl>
+            <div><dt>名称</dt><dd>{activeSource?.source_name || "-"}</dd></div>
+            <div><dt>片段</dt><dd>{segments.length} 条</dd></div>
+            <div><dt>任务</dt><dd>{activeJob ? `${activeJob.status} / ${activeJob.progress}%` : "无"}</dd></div>
+          </dl>
         </section>
-
-        <section className="context-card">
-          <p className="eyebrow">Graph sketch</p>
-          <div className="mini-graph" aria-label="当前笔记关系图">
-            <span className="node center"><Hash size={14} /> {note?.name.replace(/\.md$/, "") || "Note"}</span>
-            <span className="node n1">{graph.nodes[0]?.id || "来源证据"}</span>
-            <span className="node n2">{graph.nodes[1]?.id || "事实核查"}</span>
-            <span className="node n3">{graph.nodes[2]?.id || "时间戳索引"}</span>
-          </div>
-          {graphSummary && <pre className="graph-summary">{graphSummary}</pre>}
-        </section>
-
-        <section className="context-card">
-          <p className="eyebrow">{activeNav === "设置" ? "Model settings" : activeNav === "来源" ? "Process jobs" : "Action queue"}</p>
-          {activeNav === "设置" ? (
-            <div className="settings-form">
-              <select value={settings.provider} onChange={(event) => selectProvider(event.target.value)}>
-                {providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}
-              </select>
-              <input value={settings.api_base} onChange={(event) => setSettings({ ...settings, api_base: event.target.value })} placeholder="API Base" />
-              <input value={settings.llm_model} onChange={(event) => setSettings({ ...settings, llm_model: event.target.value })} placeholder="LLM Model" />
-              <input value={settings.vlm_model} onChange={(event) => setSettings({ ...settings, vlm_model: event.target.value })} placeholder="VLM Model" />
-              <input value={settings.fact_model} onChange={(event) => setSettings({ ...settings, fact_model: event.target.value })} placeholder="Fact Model" />
-              <input value={settings.whisper_model} onChange={(event) => setSettings({ ...settings, whisper_model: event.target.value })} placeholder="Whisper Model" />
-              <select value={settings.whisper_device} onChange={(event) => setSettings({ ...settings, whisper_device: event.target.value })}>
-                <option value="cpu">CPU</option>
-                <option value="cuda">CUDA</option>
-              </select>
-              <input type="password" value={settings.api_key} onChange={(event) => setSettings({ ...settings, api_key: event.target.value })} placeholder="API Key" />
-              <div className="settings-row">
-                <label>
-                  <span>ASR</span>
-                  <select value={asrOptions.asr_engine} onChange={(event) => setAsrOptions({ ...asrOptions, asr_engine: event.target.value })}>
-                    <option value="dashscope">DashScope</option>
-                    <option value="local">Local Whisper</option>
-                  </select>
-                </label>
-                <label>
-                  <span>语言</span>
-                  <select value={asrOptions.whisper_lang} onChange={(event) => setAsrOptions({ ...asrOptions, whisper_lang: event.target.value })}>
-                    <option value="auto">Auto</option>
-                    <option value="zh">中文</option>
-                    <option value="en">English</option>
-                    <option value="ja">日本語</option>
-                  </select>
-                </label>
-              </div>
-              {settingsStatus && (
-                <p className={settingsStatus.ok ? "settings-status ok" : "settings-status error"}>
-                  {settingsStatus.message} · {settingsStatus.status || "local"}
-                </p>
-              )}
-              <div className="settings-actions">
-                <button className="marker-button" onClick={testSettings}>测试配置</button>
-                <button className="marker-button primary" onClick={saveSettings}>保存配置</button>
-              </div>
-            </div>
-          ) : activeNav === "来源" ? (
-            <div className="task-list">
-              {jobs.slice(0, 5).map((job) => (
-                <button className={job.id === activeJob?.id ? "job-row active" : "job-row"} key={job.id} onClick={() => setActiveJobId(job.id)}>
-                  <span>{job.status}</span>
-                  <strong>{job.progress}%</strong>
-                </button>
-              ))}
-              {activeJob ? (
-                <div className="job-detail">
-                  <p><strong>{activeJob.id.slice(0, 10)}</strong> · {activeJob.status}</p>
-                  {activeJob.result && <p>来源 {activeJob.result.processed_sources} · 笔记 {activeJob.result.written_notes}</p>}
-                  {activeJob.error && <p className="error-text">{activeJob.error}</p>}
-                  {activeJob.status === "failed" && <button className="tiny-button" onClick={() => retryJob(activeJob.id)}>重试</button>}
-                  <div className="job-log-list">
-                    {activeJob.logs.map((log) => (
-                      <label key={`${log.time}-${log.message}`}><CircleDot size={15} /><span>{log.time} · {log.message}</span></label>
-                    ))}
-                  </div>
-                </div>
-              ) : <span className="muted-text">暂无处理任务</span>}
-            </div>
-          ) : (
-            <div className="task-list">
-              {(note?.source_mentions || []).slice(0, 4).map((item) => (
-                <label key={`${item.source_note_path}-${item.timestamp_label}`}>
-                  <ShieldAlert size={15} />
-                  <span>{item.source_note_path}#{item.timestamp_label}</span>
-                </label>
-              ))}
-              <label><ListChecks size={15} /><span>保存后自动刷新反链和图谱</span></label>
-              {trashItems.slice(0, 4).map((item) => (
-                <button className="trash-row" key={item.id} onClick={() => restoreTrashItem(item.id)}>
-                  <RotateCcw size={15} />
-                  <span>{item.name}</span>
-                  <small>{item.original_path}</small>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {user.role === "admin" && (
-          <section className="context-card admin-log">
-            <div className="section-title compact">
-              <p className="eyebrow">Admin logs</p>
-              <button className="tiny-button" onClick={exportLogs}>导出</button>
-            </div>
-            {logs.slice(0, 5).map((log, index) => (
-              <p key={index}><strong>{String(log.action || "")}</strong> {String(log.detail || "")}</p>
-            ))}
-          </section>
-        )}
 
         <section className="status-note">
           {loading ? <Loader2 size={17} className="spin" /> : <CheckCircle2 size={17} />}
@@ -1456,7 +1718,7 @@ function Tree({
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  if (!nodes.length) return <div className="empty-state">Vault 为空，点击新建笔记开始。</div>;
+  if (!nodes.length) return <div className="empty-state">笔记库为空，点击新建笔记开始。</div>;
   return (
     <>
       {nodes.map((node) => {

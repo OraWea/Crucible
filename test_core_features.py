@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Crucible.config import Config
 from Crucible.models.api_client import OpenAICompatibleClient, ProviderUnavailableError
+from Crucible.utils.audio_processor import AudioProcessor
 from Crucible.utils.processing_workflow import ProcessingOptions, ProcessingWorkflow
 from Crucible.utils.fs_router import FSRouter
 from Crucible.utils.graph_builder import KnowledgeGraphBuilder
@@ -374,6 +375,78 @@ class TestCoreFeatures(unittest.TestCase):
             workflow._source_hash(url, is_url=True),
             hashlib.sha256(url.encode("utf-8")).hexdigest(),
         )
+
+    def test_audio_processor_uses_unique_temp_audio_outputs(self):
+        processor = AudioProcessor()
+        original_convert = processor.convert_audio_format
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                source_path = os.path.join(tmp_dir, "demo.mp3")
+                with open(source_path, "wb") as f:
+                    f.write(b"demo-audio")
+
+                def fake_convert_audio(input_path, output_path, sample_rate=16000):
+                    with open(output_path, "wb") as out:
+                        out.write(b"wav")
+                    return output_path
+
+                processor.convert_audio_format = fake_convert_audio
+                first = processor.process_media(source_path, tmp_dir)
+                second = processor.process_media(source_path, tmp_dir)
+
+                self.assertNotEqual(first, second)
+                self.assertTrue(os.path.basename(first).startswith("processed_audio_"))
+                self.assertTrue(os.path.exists(first))
+                self.assertTrue(os.path.exists(second))
+        finally:
+            processor.convert_audio_format = original_convert
+
+    def test_audio_processor_resolves_actual_yt_dlp_output_when_ext_is_na(self):
+        processor = AudioProcessor()
+
+        class FakeYDL:
+            def __init__(self, prepared_path):
+                self.prepared_path = prepared_path
+
+            def prepare_filename(self, info):
+                return self.prepared_path
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_stem = "downloaded_test"
+            actual_path = os.path.join(tmp_dir, f"{output_stem}.m4a")
+            prepared_path = os.path.join(tmp_dir, f"{output_stem}.NA")
+            with open(actual_path, "wb") as f:
+                f.write(b"media")
+
+            resolved = processor._resolve_downloaded_media_path({}, FakeYDL(prepared_path), tmp_dir, output_stem)
+
+            self.assertEqual(resolved, actual_path)
+
+    def test_audio_processor_prefers_merged_video_over_download_fragments(self):
+        processor = AudioProcessor()
+
+        class FakeYDL:
+            def prepare_filename(self, info):
+                return info["requested_downloads"][0]["filepath"]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_stem = "downloaded_video"
+            fragment_path = os.path.join(tmp_dir, f"{output_stem}.f302.webm")
+            audio_path = os.path.join(tmp_dir, f"{output_stem}.m4a")
+            merged_path = os.path.join(tmp_dir, f"{output_stem}.mp4")
+            for path in (fragment_path, audio_path, merged_path):
+                with open(path, "wb") as f:
+                    f.write(b"media")
+
+            info = {
+                "requested_downloads": [
+                    {"filepath": fragment_path},
+                    {"filepath": audio_path},
+                ],
+            }
+            resolved = processor._resolve_downloaded_media_path(info, FakeYDL(), tmp_dir, output_stem)
+
+            self.assertEqual(resolved, merged_path)
 
     def test_process_entrypoints_keep_heavy_work_async(self):
         root_dir = os.path.dirname(os.path.abspath(__file__))

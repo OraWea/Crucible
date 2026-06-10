@@ -133,8 +133,9 @@ class ProcessingWorkflow:
         metadata = self._build_source_metadata(source, source_ext, source_type, is_url)
         keyframes = []
         if source_ext in Config.SUPPORTED_VIDEO_FORMATS or source_ext in Config.SUPPORTED_AUDIO_FORMATS:
-            structured_source, segments, duration, keyframes = self._process_media_source(source, source_ext, is_url, source_hash)
+            structured_source, segments, duration, keyframes, media_metadata = self._process_media_source(source, source_ext, is_url, source_hash)
             metadata["duration"] = duration
+            metadata.update(media_metadata)
         elif source_ext in Config.SUPPORTED_DOC_FORMATS:
             self.progress("第一步: 解析并读取文档文本...", 30)
             structured_source = doc_parser.parse_file(source)
@@ -169,7 +170,10 @@ class ProcessingWorkflow:
 
     def _process_media_source(self, source: str, source_ext: str, is_url: bool, source_hash: str) -> tuple:
         self.progress("第一步: 音频分离与重采样中...", 20)
-        wav_path = audio_processor.process_media(source, Config.TEMP_DIR)
+        prepared_media = audio_processor.prepare_media(source, Config.TEMP_DIR)
+        wav_path = prepared_media["audio_path"]
+        media_path = prepared_media["media_path"]
+        media_ext = prepared_media.get("media_ext") or source_ext
         duration = audio_processor.get_audio_duration(wav_path)
 
         self.progress("第二步: ASR 转写语音文本中...", 40)
@@ -179,17 +183,21 @@ class ProcessingWorkflow:
 
         structured_source = "【视频声音转写内容】:\n" + full_source_text + "\n\n"
         keyframes = []
-        if not is_url and source_ext in Config.SUPPORTED_VIDEO_FORMATS:
+        media_metadata = {}
+        if media_ext in Config.SUPPORTED_VIDEO_FORMATS:
+            media_metadata.update(video_processor.get_video_metadata(media_path))
             self.progress("第三步: 抽取视频关键帧并执行 VLM 分析 (OCR + 描述)...", 60)
             ts_list = [round(duration * 0.1, 2), round(duration * 0.5, 2), round(duration * 0.9, 2)]
-            vlm_contexts = vlm_analyzer.analyze_video(source, ts_list)
-            keyframes = self._save_keyframes(source, source_hash, ts_list, vlm_contexts)
+            vlm_contexts = vlm_analyzer.analyze_video(media_path, ts_list)
+            keyframes = self._save_keyframes(media_path, source_hash, ts_list, vlm_contexts)
             if vlm_contexts:
                 structured_source += "【视频画面抽帧分析】:\n"
                 for ts, ctx in vlm_contexts.items():
                     structured_source += f"- 在 {ts}s 画面:\n  OCR 文字: {ctx['ocr']}\n  画面描述: {ctx['description']}\n"
+        elif is_url:
+            self.progress("在线视频仅获取到音频流，跳过关键帧分析。", 60)
 
-        return structured_source, segments, duration, keyframes
+        return structured_source, segments, duration, keyframes, media_metadata
 
     def _build_source_metadata(self, source: str, source_ext: str, source_type: str, is_url: bool) -> Dict:
         metadata = {

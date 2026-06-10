@@ -2,6 +2,7 @@ import os
 import logging
 import time
 import datetime
+import re
 from typing import Dict, Any, List
 from Crucible.utils.db_manager import db_manager
 from Crucible.utils.fs_router import fs_router
@@ -87,6 +88,13 @@ class LLMCore:
             concepts = parse_json_response(raw_response)
             if not isinstance(concepts, list):
                 raise ValueError("概念抽取结果必须是 JSON 数组")
+
+            if not concepts:
+                fallback_concepts = self._extract_fallback_concepts(raw_input_text)
+                if fallback_concepts:
+                    logger.warning("LLM 返回空概念，已使用本地启发式概念兜底。")
+                    db_manager.add_log("WARNING", "LLM", "Extract_Fallback", f"本地兜底提取 {len(fallback_concepts)} 个概念")
+                    return fallback_concepts
             
             duration = time.time() - start_time
             logger.info(f"概念提取完成，共识别出 {len(concepts)} 个核心概念，用时 {duration:.2f}s")
@@ -96,12 +104,88 @@ class LLMCore:
             
         except ProviderUnavailableError as e:
             logger.warning("LLM Provider 不可用，概念抽取降级为空结果: %s", e)
-            db_manager.add_log("WARNING", "LLM", "Extract_Downgrade", "Provider 不可用，返回空概念列表")
-            return []
+            fallback_concepts = self._extract_fallback_concepts(raw_input_text)
+            db_manager.add_log("WARNING", "LLM", "Extract_Downgrade", f"Provider 不可用，本地兜底提取 {len(fallback_concepts)} 个概念")
+            return fallback_concepts
         except Exception as e:
             logger.error(f"解析概念 JSON 失败，模型原始输出为:\n{raw_response}")
             db_manager.add_log("ERROR", "LLM", "Extract_Failure", f"JSON解析错误: {e}")
             raise
+
+    def _extract_fallback_concepts(self, raw_input_text: str, max_items: int = 5) -> List[Dict[str, Any]]:
+        """在云端/本地 LLM 不可用或返回空数组时，做保守主题兜底。"""
+        text = raw_input_text or ""
+        source_name = self._metadata_value(text, "source_name")
+        candidates: Dict[str, int] = {}
+
+        title_candidate = self._concept_from_title(source_name)
+        if title_candidate:
+            candidates[title_candidate] = candidates.get(title_candidate, 0) + 20
+
+        body = re.sub(r"【来源元数据】.*?(?=【来源时间戳片段】|【视频声音转写内容】|$)", "", text, flags=re.S)
+        body = re.sub(r"\b\d{2}:\d{2}:\d{2}\b", " ", body)
+        body = re.sub(r"source_[a-z_]+:\s*.*", " ", body)
+
+        for match in re.findall(r"\b[A-Za-z][A-Za-z0-9+#.\-]{2,}\b", body):
+            cleaned = match.strip(".-")
+            if cleaned.lower() in {"http", "https", "mp4", "wav", "m4a", "ocr", "fps"}:
+                continue
+            candidates[cleaned] = candidates.get(cleaned, 0) + 8
+
+        for match in re.findall(r"[\u4e00-\u9fff][\u4e00-\u9fffA-Za-z0-9·\-]{1,15}", body):
+            cleaned = self._clean_chinese_candidate(match)
+            if not cleaned:
+                continue
+            candidates[cleaned] = candidates.get(cleaned, 0) + min(len(cleaned), 8)
+
+        ranked = sorted(candidates.items(), key=lambda item: (-item[1], len(item[0])))
+        concepts = []
+        for name, _score in ranked:
+            if any(name in existing["concept"] or existing["concept"] in name for existing in concepts):
+                continue
+            evidence = self._evidence_sentences(body, name)
+            concepts.append({
+                "concept": name,
+                "definition": f"从来源内容中自动识别出的主题：{name}。该条为本地兜底结果，建议人工复核和补充。",
+                "key_points": evidence or ["由本地启发式规则从来源标题或转写片段中识别。"],
+                "code_or_formula": "",
+                "target_path": f"Concepts/{fs_router.sanitize_filename(name)}",
+            })
+            if len(concepts) >= max_items:
+                break
+        return concepts
+
+    def _metadata_value(self, text: str, key: str) -> str:
+        match = re.search(rf"^{re.escape(key)}:\s*(.+)$", text or "", re.MULTILINE)
+        return match.group(1).strip() if match else ""
+
+    def _concept_from_title(self, source_name: str) -> str:
+        title = os.path.splitext(os.path.basename(source_name or ""))[0]
+        title = re.sub(r"^[0-9a-fA-F]{16,}_", "", title)
+        title = re.sub(r"^\[.*?\]", "", title)
+        title = re.sub(r"(生成|一个|一段|简短|科普|视频|音频|文件|讲解|介绍|的)", "", title)
+        title = re.sub(r"[_\-\s]+", "", title).strip(" _-，。,.")
+        return title[:24] if len(title) >= 2 else ""
+
+    def _clean_chinese_candidate(self, value: str) -> str:
+        cleaned = re.sub(r"(这个|我们|可以|通过|进行|来源|时间戳|视频|声音|内容|片段|画面|分析|文字|描述|暂无|文件|成功|提取)", "", value)
+        cleaned = cleaned.strip(" ，。,.、:：；;（）()[]【】")
+        if len(cleaned) < 2 or len(cleaned) > 12:
+            return ""
+        if re.fullmatch(r"[一二三四五六七八九十]+", cleaned):
+            return ""
+        return cleaned
+
+    def _evidence_sentences(self, text: str, concept_name: str) -> List[str]:
+        sentences = re.split(r"[。！？!?；;\n]", text or "")
+        evidence = []
+        for sentence in sentences:
+            cleaned = sentence.strip(" -:：\t")
+            if concept_name in cleaned and 4 <= len(cleaned) <= 120:
+                evidence.append(cleaned)
+            if len(evidence) >= 3:
+                break
+        return evidence
 
     def merge_and_write_wiki(self, concept_data: Dict[str, Any], source_filename: str) -> str:
         """

@@ -449,6 +449,7 @@ async function login(page: Page) {
 test("可以查看来源详情并通过片段追溯到笔记", async ({ page }) => {
   await login(page);
 
+  await page.getByRole("navigation", { name: "主导航" }).getByRole("button", { name: "来源" }).click();
   await expect(page.getByRole("heading", { name: "Demo Source" })).toBeVisible();
   await expect(page.getByText("1920x1080")).toBeVisible();
   await expect(page.getByText("5 MB")).toBeVisible();
@@ -489,7 +490,7 @@ test("可以创建笔记并执行回收站恢复流程", async ({ page }) => {
   await expect(page.getByText("已移入回收站")).toBeVisible();
   await expect(page.locator(".vault-tree .tree-node-line", { hasText: "E2E Note" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Vault" }).click({ force: true });
+  await page.getByRole("navigation", { name: "主导航" }).getByRole("button", { name: "笔记" }).click({ force: true });
   await page.getByRole("button", { name: /E2E Note\.md/ }).click({ force: true });
   await expect(page.getByText("已从回收站恢复")).toBeVisible();
   await expect(page.locator(".vault-tree .tree-node-line", { hasText: "E2E Note" })).toHaveCount(1);

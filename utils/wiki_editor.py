@@ -6,6 +6,7 @@ import tempfile
 import re
 import hashlib
 import threading
+import html
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -162,15 +163,37 @@ class WikiEditor:
         if cached is not None:
             return cached
 
+        embeds = []
+
+        def replace_embed(match):
+            item = self.extract_wiki_link_items(f"[[{match.group(1)}]]")[0]
+            token = f"CRUCIBLE_EMBED_{len(embeds)}"
+            embeds.append((token, item))
+            return token
+
         def replace_link(match):
             item = self.extract_wiki_link_items(f"[[{match.group(1)}]]")[0]
             href = quote(item["raw"], safe="")
             return f"[{item['label']}](crucible://note/{href})"
 
-        normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, content)
+        normalized = re.sub(r'!\[\[(.*?)\]\]', replace_embed, content)
+        normalized = re.sub(r'\[\[(.*?)\]\]', replace_link, normalized)
         rendered = self._sanitize_rendered_html(self.md_parser.render(normalized))
+        for token, item in embeds:
+            rendered = self._replace_embed_token(rendered, token, item)
         self._set_preview_cache(cache_key, rendered)
         return rendered
+
+    def _replace_embed_token(self, rendered: str, token: str, item: Dict[str, str]) -> str:
+        target = item.get("target", "").strip()
+        label = html.escape(item.get("label") or os.path.basename(target) or "附件")
+        ext = os.path.splitext(target)[1].lower()
+        if ext not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+            replacement = f'<span class="missing-embed">不支持预览附件：{label}</span>'
+        else:
+            src = f"/api/assets?path={quote(target, safe='')}"
+            replacement = f'<img class="obsidian-embed-image" src="{src}" alt="{label}" loading="lazy" />'
+        return rendered.replace(f"<p>{token}</p>", replacement).replace(token, replacement)
 
     def _preview_cache_key(self, content: str) -> str:
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()

@@ -2,6 +2,7 @@ import sqlite3
 import os
 import datetime
 import logging
+from contextlib import contextmanager
 from Crucible.config import Config
 
 logger = logging.getLogger(__name__)
@@ -11,13 +12,20 @@ class DBManager:
         self.db_path = db_path
         self.init_db()
 
+    @contextmanager
     def get_connection(self):
         """获取数据库连接"""
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
         # 启用行字典访问方式，便于转化成 dict
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def init_db(self):
         """初始化 SQLite 数据库及创建日志表"""

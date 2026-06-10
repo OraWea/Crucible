@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import importlib
+import mimetypes
 import os
 import requests
 import secrets
@@ -557,6 +558,19 @@ def preview_note(payload: PreviewRequest, user: Dict[str, str] = Depends(_curren
     return {"preview_html": wiki_editor.render_markdown_preview(payload.content)}
 
 
+@app.get("/api/assets")
+def get_vault_asset(path: str) -> FileResponse:
+    rel_path = (path or "").split("#", 1)[0].strip()
+    file_path = _safe_vault_path(rel_path)
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+        raise HTTPException(status_code=400, detail="Unsupported asset type")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    media_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    return FileResponse(file_path, media_type=media_type)
+
+
 @app.post("/api/notes/open-wiki-target")
 def open_wiki_target(payload: OpenWikiTargetRequest, user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     file_path, anchor = _resolve_wiki_target(payload.target)
@@ -716,7 +730,7 @@ def export_logs(user: Dict[str, str] = Depends(_admin_user)) -> str:
 def list_sources(user: Dict[str, str] = Depends(_current_user)) -> Dict[str, Any]:
     with db_manager.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM sources ORDER BY updated_at DESC")
+        cursor.execute("SELECT * FROM sources ORDER BY updated_at DESC, id DESC")
         rows = [dict(row) for row in cursor.fetchall()]
     return {"sources": rows}
 

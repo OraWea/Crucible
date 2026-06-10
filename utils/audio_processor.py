@@ -25,7 +25,7 @@ class AudioProcessor:
                 ) from exc
             raise
 
-    def _yt_dlp_options(self, url: str = "", output_dir: str = "", skip_download: bool = False) -> dict:
+    def _yt_dlp_options(self, url: str = "", output_dir: str = "", skip_download: bool = False, output_stem: str = "") -> dict:
         """构造在线媒体下载配置，补齐 Bilibili 等站点需要的浏览器请求头。"""
         headers = {
             'User-Agent': Config.YTDLP_USER_AGENT,
@@ -48,8 +48,11 @@ class AudioProcessor:
         if skip_download:
             options['skip_download'] = True
         else:
-            options['format'] = 'bestaudio/best'
-            options['outtmpl'] = os.path.join(output_dir, f'downloaded_{uuid.uuid4().hex}.%(ext)s')
+            # 优先下载可抽帧的视频流；失败时回退到纯音频，保证转写仍可继续。
+            options['format'] = 'bestvideo[height<=720]+bestaudio/best[height<=720]/bestvideo+bestaudio/bestaudio/best'
+            options['merge_output_format'] = 'mp4'
+            stem = output_stem or f'downloaded_{uuid.uuid4().hex}'
+            options['outtmpl'] = os.path.join(output_dir, f'{stem}.%(ext)s')
 
         cookies_file = (Config.YTDLP_COOKIES_FILE or '').strip()
         if cookies_file:
@@ -154,27 +157,27 @@ class AudioProcessor:
             media_path_or_url: 本地文件路径或网络 URL
             temp_dir: 临时工作目录
         """
+        return self.prepare_media(media_path_or_url, temp_dir)["audio_path"]
+
+    def prepare_media(self, media_path_or_url: str, temp_dir: str) -> dict:
+        """返回下载/解析后的媒体路径和转写用 WAV 路径，供视频关键帧复用。"""
         try:
-            # 1. 检查是否为网络 URL
             if media_path_or_url.startswith(('http://', 'https://')):
                 logger.info(f"检测到在线 URL: {media_path_or_url}，启动 yt-dlp 下载...")
-                downloaded_file = self.download_online_media(media_path_or_url, temp_dir)
-                media_path = downloaded_file
+                media_path = self.download_online_media(media_path_or_url, temp_dir)
             else:
                 media_path = media_path_or_url
-                
+
             if not os.path.exists(media_path):
                 raise FileNotFoundError(f"媒体文件不存在: {media_path}")
-                
+
             ext = os.path.splitext(media_path)[1].lower()
-            output_audio = os.path.join(temp_dir, 'processed_audio.wav')
-            
-            # 2. 如果是视频，进行音频分离；如果是音频，重采样
+            output_audio = os.path.join(temp_dir, f'processed_audio_{uuid.uuid4().hex}.wav')
             if ext in ['.mp4', '.mkv', '.avi', '.mov', '.webm']:
-                return self.extract_audio_from_video(media_path, output_audio)
+                audio_path = self.extract_audio_from_video(media_path, output_audio)
             else:
-                return self.convert_audio_format(media_path, output_audio)
-                
+                audio_path = self.convert_audio_format(media_path, output_audio)
+            return {"media_path": media_path, "audio_path": audio_path, "media_ext": ext}
         except Exception as e:
             logger.error(f"媒体预处理阶段失败: {e}")
             raise
@@ -189,12 +192,13 @@ class AudioProcessor:
         """
         try:
             import yt_dlp
-            ydl_opts = self._yt_dlp_options(url, output_dir=output_dir)
+            output_stem = f'downloaded_{uuid.uuid4().hex}'
+            ydl_opts = self._yt_dlp_options(url, output_dir=output_dir, output_stem=output_stem)
             
             logger.info("开始请求网络媒体数据...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
+                filename = self._resolve_downloaded_media_path(info, ydl, output_dir, output_stem)
                 
             logger.info(f"网络媒体下载完成: {filename}")
             return filename
@@ -204,6 +208,66 @@ class AudioProcessor:
             logger.error(f"在线 URL 下载失败: {e}", exc_info=True)
             err_msg = self._online_media_error_message(e)
             raise RuntimeError(f"在线媒体下载失败: {err_msg}")
+
+    def _resolve_downloaded_media_path(self, info: dict, ydl, output_dir: str, output_stem: str) -> str:
+        """解析 yt-dlp 的真实落盘文件，优先返回可抽帧的最终合并视频。"""
+        candidates = []
+
+        for item in info.get("requested_downloads") or []:
+            candidates.extend([
+                item.get("filepath"),
+                item.get("_filename"),
+                item.get("filename"),
+            ])
+
+        candidates.extend([
+            info.get("filepath"),
+            info.get("_filename"),
+            info.get("filename"),
+        ])
+
+        try:
+            candidates.append(ydl.prepare_filename(info))
+        except Exception:
+            pass
+
+        if os.path.isdir(output_dir):
+            prefix = f"{output_stem}."
+            for name in os.listdir(output_dir):
+                if not name.startswith(prefix):
+                    continue
+                full_path = os.path.join(output_dir, name)
+                if os.path.isfile(full_path):
+                    candidates.append(full_path)
+
+        existing = [candidate for candidate in candidates if candidate and os.path.exists(candidate)]
+        if existing:
+            existing.sort(key=lambda path: self._download_candidate_rank(path, output_stem))
+            return existing[0]
+
+        fallback = candidates[-1] if candidates else os.path.join(output_dir, f"{output_stem}.NA")
+        raise FileNotFoundError(f"在线媒体下载完成但未找到输出文件: {fallback}")
+
+    def _download_candidate_rank(self, path: str, output_stem: str) -> tuple:
+        """给 yt-dlp 输出候选排序：最终视频 > 视频分片 > 音频 > 其他。"""
+        name = os.path.basename(path)
+        stem, ext = os.path.splitext(name)
+        ext = ext.lower()
+        exact_stem = stem == output_stem
+        video_exts = set(Config.SUPPORTED_VIDEO_FORMATS)
+        audio_exts = set(Config.SUPPORTED_AUDIO_FORMATS)
+
+        if exact_stem and ext in video_exts:
+            media_rank = 0
+        elif ext in video_exts:
+            media_rank = 1
+        elif exact_stem and ext in audio_exts:
+            media_rank = 2
+        elif ext in audio_exts:
+            media_rank = 3
+        else:
+            media_rank = 4
+        return (media_rank, 0 if exact_stem else 1, -os.path.getmtime(path))
 
     def get_audio_duration(self, audio_path: str) -> float:
         """获取音频文件的总时长（秒）"""

@@ -31,6 +31,14 @@
       "created_by": "agent"
     }
   ],
+  "frontend/e2e/workspace.spec.ts": [
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T03:03:41.9026521Z",
+      "updated_at": "2026-06-10T03:04:56.20775Z",
+      "created_by": "agent"
+    }
+  ],
   "frontend/index.html": [
     {
       "source_session": "1780057061-3669e9e9bbe2",
@@ -53,6 +61,12 @@
       "created_at": "2026-05-29T12:20:00.4676367Z",
       "updated_at": "2026-05-29T13:23:54.1329808Z",
       "created_by": "agent"
+    },
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T02:43:04.2642831Z",
+      "updated_at": "2026-06-10T03:04:44.4851321Z",
+      "created_by": "agent"
     }
   ],
   "frontend/src/styles.css": [
@@ -60,6 +74,12 @@
       "source_session": "1780057061-3669e9e9bbe2",
       "created_at": "2026-05-29T12:20:00.4831031Z",
       "updated_at": "2026-05-29T13:24:04.3410367Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T02:43:30.5162987Z",
+      "updated_at": "2026-06-10T03:01:03.9997189Z",
       "created_by": "agent"
     }
   ],
@@ -92,6 +112,30 @@
       "source_session": "1780057061-3669e9e9bbe2",
       "created_at": "2026-05-29T13:08:10.7668175Z",
       "updated_at": "2026-05-29T13:08:10.8030139Z",
+      "created_by": "agent"
+    }
+  ],
+  "test_core_features.py": [
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T02:43:58.2761349Z",
+      "updated_at": "2026-06-10T02:43:58.2936225Z",
+      "created_by": "agent"
+    }
+  ],
+  "utils/audio_processor.py": [
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T02:42:09.773324Z",
+      "updated_at": "2026-06-10T02:42:09.7916157Z",
+      "created_by": "agent"
+    }
+  ],
+  "utils/db_manager.py": [
+    {
+      "source_session": "1781059109-5dfe88393fe5",
+      "created_at": "2026-06-10T02:46:30.5615734Z",
+      "updated_at": "2026-06-10T02:46:30.5818974Z",
       "created_by": "agent"
     }
   ]
