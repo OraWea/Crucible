@@ -3,6 +3,7 @@ openai-whisper
 transformers>=4.35.0
 torch>=2.0.0
 pydub
+audioop-lts; python_version >= "3.13"
 opencv-python
 pypdf
 yt-dlp

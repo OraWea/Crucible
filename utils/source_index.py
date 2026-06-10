@@ -27,6 +27,104 @@ def source_timestamp_link(source_note_rel_path: str, seconds: float) -> str:
 class SourceIndex:
     """管理来源页、时间轴片段和概念反查索引。"""
 
+    def replace_source_index(
+        self,
+        *,
+        source_name: str,
+        source_type: str,
+        source_uri: str,
+        source_hash: str = "",
+        duration: float = 0.0,
+        asr_engine: str = "",
+        vlm_model: str = "",
+        metadata: Optional[Dict] = None,
+        keyframes: Optional[List[Dict]] = None,
+        segments: Optional[List[Dict]] = None,
+        concepts: Optional[List[Dict]] = None,
+    ) -> Dict:
+        """在单个 SQLite 事务内替换来源、片段和概念反查索引。"""
+        source_key = source_hash or source_uri
+        source_note_path = self._source_note_rel_path(source_name)
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        segments = segments or []
+        concepts = concepts or []
+
+        with db_manager.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO sources (
+                    source_name, source_type, source_uri, source_hash, duration,
+                    source_note_path, asr_engine, vlm_model, metadata_json,
+                    keyframes_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source_hash) DO UPDATE SET
+                    source_name=excluded.source_name,
+                    source_type=excluded.source_type,
+                    source_uri=excluded.source_uri,
+                    duration=excluded.duration,
+                    source_note_path=excluded.source_note_path,
+                    asr_engine=excluded.asr_engine,
+                    vlm_model=excluded.vlm_model,
+                    metadata_json=excluded.metadata_json,
+                    keyframes_json=excluded.keyframes_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    source_name,
+                    source_type,
+                    source_uri,
+                    source_key,
+                    duration,
+                    source_note_path,
+                    asr_engine,
+                    vlm_model,
+                    json.dumps(metadata or {}, ensure_ascii=False),
+                    json.dumps(keyframes or [], ensure_ascii=False),
+                    now,
+                    now,
+                ),
+            )
+            cursor.execute("SELECT * FROM sources WHERE source_hash = ?", (source_key,))
+            source = dict(cursor.fetchone())
+            source_id = source["id"]
+
+            cursor.execute("DELETE FROM concept_mentions WHERE source_id = ?", (source_id,))
+            cursor.execute("DELETE FROM segments WHERE source_id = ?", (source_id,))
+
+            inserted_segments = []
+            for idx, segment in enumerate(segments):
+                start_time = float(segment.get("start") or 0.0)
+                cursor.execute(
+                    """
+                    INSERT INTO segments (source_id, start_time, end_time, text, timestamp_label, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        source_id,
+                        start_time,
+                        float(segment.get("end") or 0.0),
+                        segment.get("text", ""),
+                        format_timestamp(start_time),
+                        idx,
+                    ),
+                )
+                inserted_segments.append({
+                    "id": cursor.lastrowid,
+                    "source_id": source_id,
+                    "start_time": start_time,
+                    "end_time": float(segment.get("end") or 0.0),
+                    "text": segment.get("text", ""),
+                    "timestamp_label": format_timestamp(start_time),
+                    "sort_order": idx,
+                })
+
+            self._insert_concept_mentions(cursor, source, inserted_segments, concepts)
+            conn.commit()
+
+        return source
+
     def upsert_source(
         self,
         source_name: str,
@@ -39,8 +137,7 @@ class SourceIndex:
         metadata: Optional[Dict] = None,
         keyframes: Optional[List[Dict]] = None,
     ) -> Dict:
-        source_note_path = self._source_note_path(source_name)
-        source_note_rel_path = fs_router.get_relative_path(source_note_path)
+        source_note_rel_path = self._source_note_rel_path(source_name)
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         with db_manager.get_connection() as conn:
@@ -109,37 +206,12 @@ class SourceIndex:
 
     def replace_concept_mentions(self, source: Dict, concepts: List[Dict]) -> None:
         source_id = source["id"]
-        source_note_path = source["source_note_path"]
         segments = self.get_segments(source_id)
 
         with db_manager.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM concept_mentions WHERE source_id = ?", (source_id,))
-
-            for concept in concepts:
-                concept_name = concept.get("concept", "").strip()
-                if not concept_name:
-                    continue
-                matched_segments = self._match_segments(concept_name, segments)
-                if not matched_segments and segments:
-                    matched_segments = [segments[0]]
-
-                for segment in matched_segments:
-                    cursor.execute(
-                        """
-                        INSERT INTO concept_mentions (
-                            source_id, concept_name, segment_id, timestamp_label, source_note_path
-                        )
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            source_id,
-                            concept_name,
-                            segment.get("id"),
-                            segment.get("timestamp_label", "00:00:00"),
-                            source_note_path,
-                        ),
-                    )
+            self._insert_concept_mentions(cursor, source, segments, concepts)
             conn.commit()
 
     def write_source_note(self, source: Dict, segments: List[Dict], concepts: List[Dict]) -> str:
@@ -419,6 +491,37 @@ class SourceIndex:
     def _source_note_path(self, source_name: str) -> str:
         safe_name = fs_router.sanitize_filename(source_name)
         return fs_router.resolve_note_path(os.path.join("Sources", safe_name), source_name)
+
+    def _source_note_rel_path(self, source_name: str) -> str:
+        return fs_router.get_relative_path(self._source_note_path(source_name))
+
+    def _insert_concept_mentions(self, cursor, source: Dict, segments: List[Dict], concepts: List[Dict]) -> None:
+        source_id = source["id"]
+        source_note_path = source["source_note_path"]
+        for concept in concepts:
+            concept_name = concept.get("concept", "").strip()
+            if not concept_name:
+                continue
+            matched_segments = self._match_segments(concept_name, segments)
+            if not matched_segments and segments:
+                matched_segments = [segments[0]]
+
+            for segment in matched_segments:
+                cursor.execute(
+                    """
+                    INSERT INTO concept_mentions (
+                        source_id, concept_name, segment_id, timestamp_label, source_note_path
+                    )
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        source_id,
+                        concept_name,
+                        segment.get("id"),
+                        segment.get("timestamp_label", "00:00:00"),
+                        source_note_path,
+                    ),
+                )
 
     def _match_segments(self, concept_name: str, segments: List[Dict]) -> List[Dict]:
         pattern = re.compile(re.escape(concept_name), re.IGNORECASE)

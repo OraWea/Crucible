@@ -19,6 +19,14 @@ class Config:
     # 临时文件夹与日志路径
     TEMP_DIR = os.path.join(BASE_DIR, 'temp')
     LOG_FILE = os.path.join(BASE_DIR, 'app.log')
+
+    # yt-dlp 在线媒体下载配置。Cookies 文件可用浏览器导出，路径不要提交到仓库。
+    YTDLP_COOKIES_FILE = os.environ.get('YTDLP_COOKIES_FILE') or os.environ.get('BILIBILI_COOKIES_FILE') or ''
+    YTDLP_USER_AGENT = os.environ.get('YTDLP_USER_AGENT') or (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/125.0.0.0 Safari/537.36'
+    )
     
     # ASR Whisper 模型设置
     WHISPER_MODEL_NAME = os.environ.get('WHISPER_MODEL_NAME') or 'base'

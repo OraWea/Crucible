@@ -406,6 +406,35 @@ h3 {
   justify-content: flex-end;
 }
 
+.url-add-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  min-width: min(310px, 100%);
+  padding: 0 11px;
+  border: 2px solid var(--ink);
+  background: #fffefa;
+  box-shadow: inset 3px 3px 0 rgba(38, 50, 56, 0.08);
+}
+
+.url-add-box input {
+  width: 100%;
+  min-width: 120px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.url-feedback {
+  margin-top: -6px;
+  padding: 10px 13px;
+  color: #9b3f21;
+  font-size: 13px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 .marker-button {
   display: inline-flex;
   align-items: center;

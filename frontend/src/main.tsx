@@ -100,6 +100,8 @@ function App() {
   const [activeSource, setActiveSource] = useState<SourceRecord | null>(null);
   const [sourceDetail, setSourceDetail] = useState<SourceDetail | null>(null);
   const [sourceFilter, setSourceFilter] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [urlStatus, setUrlStatus] = useState("");
   const [keyframeUrls, setKeyframeUrls] = useState<Record<string, string>>({});
   const [segments, setSegments] = useState<SegmentRecord[]>([]);
   const [note, setNote] = useState<NotePayload | null>(null);
@@ -742,21 +744,32 @@ function App() {
   };
 
   const addUrlAndProcess = async () => {
-    const url = normalizeUrlInput(window.prompt("输入在线视频或网页来源 URL", "https://") || "");
+    const url = normalizeUrlInput(urlInput);
     if (!url || !/^https?:\/\/\S+$/i.test(url)) {
-      if (url) setMessage("请输入合法的 HTTP/HTTPS 链接");
+      const feedback = url ? "请输入合法的 HTTP/HTTPS 链接" : "请输入要添加的视频或网页链接";
+      setUrlStatus(feedback);
+      setMessage(feedback);
       return;
     }
     try {
+      setLoading(true);
+      setUrlStatus(`正在创建处理任务：${url}`);
+      setMessage(`正在添加链接：${url}`);
       const data = await api<{ job_id: string }>("/api/process", {
         method: "POST",
         body: JSON.stringify(processPayload([url]))
       });
       trackStartedJob(data.job_id);
-      setMessage("URL 来源处理任务已启动");
+      setUrlInput("");
+      setUrlStatus("已加入处理队列，可在右侧任务面板查看进度");
+      setActiveNav("来源");
+      setMessage(`URL 来源处理任务已启动：${url}`);
       await refreshJobs();
     } catch (error) {
+      setUrlStatus("添加链接失败，请查看错误提示");
       showError(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -999,6 +1012,21 @@ function App() {
               <UploadCloud size={17} />
               导入来源
             </button>
+            <label className="url-add-box">
+              <Link2 size={16} />
+              <input
+                aria-label="添加来源链接"
+                placeholder="粘贴视频或网页 URL..."
+                value={urlInput}
+                onChange={(event) => {
+                  setUrlInput(event.target.value);
+                  if (urlStatus) setUrlStatus("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addUrlAndProcess();
+                }}
+              />
+            </label>
             <button className="marker-button" onClick={addUrlAndProcess}>
               <Link2 size={17} />
               添加链接
@@ -1009,6 +1037,8 @@ function App() {
             </button>
           </div>
         </header>
+
+        {urlStatus && <section className="url-feedback sketch-card">{urlStatus}</section>}
 
         <section className="work-grid">
           <article className="source-pane sketch-card">

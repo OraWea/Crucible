@@ -47,5 +47,22 @@ Crucible 是一个“视频优先”的 AI 知识库，目标类似 Obsidian，�
 
 ## 提交与协作
 - Git 提交沿用简洁 Conventional Commits 风格，例如 `feat: add provider settings`、`fix: handle empty transcript`。
+
 - PR 或变更说明应包含：改动目的、影响模块、验证命令、是否涉及模型/API/用户数据。
+
 - 不要提交 `data/`、`temp/`、`app.log`、模型权重、用户 vault 或真实配置文件。
+
+- ```
+  - 细粒度半成品不要单独 commit：单个 AB / 单个常量 / 单个 layout 这种零碎改动不单独成 commit
+  - 代码可 auto commit：实现类代码可以自动提交
+  - Spec / plan 文档不入库：brainstorming / writing-plans 产出的 .md 文件不要 commit
+  ```
+
+  通用规范：
+
+  ```
+  - 不更新 git config
+  - 不擅自做破坏性操作（push --force、reset --hard、checkout . 等）
+  - 不跳过 hooks（不用 --no-verify / --no-gpg-sign）
+  - 优先 add 具体文件而不是 git add -A / git add .，避免误带 .env 等敏感文件
+  ```

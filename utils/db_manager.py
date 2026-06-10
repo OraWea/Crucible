@@ -14,6 +14,7 @@ class DBManager:
     def get_connection(self):
         """获取数据库连接"""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys = ON")
         # 启用行字典访问方式，便于转化成 dict
         conn.row_factory = sqlite3.Row
         return conn
@@ -87,7 +88,10 @@ class DBManager:
                     )
                 """)
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_segments_text ON segments(text)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_segments_source_id ON segments(source_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_concept_mentions_name ON concept_mentions(concept_name)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_concept_mentions_source_id ON concept_mentions(source_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_concept_mentions_segment_id ON concept_mentions(segment_id)")
                 conn.commit()
             logger.info("SQLite 数据库初始化成功。")
         except Exception as e:

@@ -69,7 +69,7 @@ class ProcessingWorkflow:
             self.progress("第四步: LLM 智能提炼核心概念...", 75)
             extracted_concepts = llm_core.extract_concepts(structured_source)
 
-            source_record = source_index.upsert_source(
+            source_record = source_index.replace_source_index(
                 source_name=source_payload["source_name"],
                 source_type=source_payload["source_type"],
                 source_uri=source_payload["source_uri"],
@@ -79,9 +79,9 @@ class ProcessingWorkflow:
                 vlm_model=self.options.vlm_model or Config.VLM_MODEL_NAME,
                 metadata=source_payload.get("metadata", {}),
                 keyframes=source_payload.get("keyframes", []),
+                segments=source_payload["segments"],
+                concepts=extracted_concepts,
             )
-            source_index.replace_segments(source_record["id"], source_payload["segments"])
-            source_index.replace_concept_mentions(source_record, extracted_concepts)
             source_index.write_source_note(source_record, source_payload["segments"], extracted_concepts)
 
             self.progress(f"成功提取 {len(extracted_concepts)} 个概念，开始合并织网...", 85)

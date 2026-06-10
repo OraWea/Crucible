@@ -1,7 +1,9 @@
 import os
 import logging
 import subprocess
-from pydub import AudioSegment
+import uuid
+
+from Crucible.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +11,67 @@ class AudioProcessor:
     def __init__(self):
         # 支持处理的常见媒体扩展名
         self.supported_formats = ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.mp4', '.mkv', '.avi', '.mov', '.webm']
+
+    def _audio_segment(self):
+        """延迟导入 pydub，给 Python 3.13+ 缺少 audioop-lts 时明确提示。"""
+        try:
+            from pydub import AudioSegment
+            return AudioSegment
+        except ModuleNotFoundError as exc:
+            if exc.name in {"audioop", "pyaudioop"}:
+                raise RuntimeError(
+                    "当前 Python 缺少音频兼容依赖 audioop-lts。"
+                    "请运行 `pip install -r requirements.txt` 或单独安装 `pip install audioop-lts` 后重启后端。"
+                ) from exc
+            raise
+
+    def _yt_dlp_options(self, url: str = "", output_dir: str = "", skip_download: bool = False) -> dict:
+        """构造在线媒体下载配置，补齐 Bilibili 等站点需要的浏览器请求头。"""
+        headers = {
+            'User-Agent': Config.YTDLP_USER_AGENT,
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        }
+        if "bilibili.com" in (url or "").lower() or "b23.tv" in (url or "").lower():
+            headers.update({
+                'Referer': 'https://www.bilibili.com/',
+                'Origin': 'https://www.bilibili.com',
+            })
+
+        options = {
+            'quiet': True,
+            'no_warnings': True,
+            'retries': 3,
+            'fragment_retries': 3,
+            'socket_timeout': 20,
+            'http_headers': headers,
+        }
+        if skip_download:
+            options['skip_download'] = True
+        else:
+            options['format'] = 'bestaudio/best'
+            options['outtmpl'] = os.path.join(output_dir, f'downloaded_{uuid.uuid4().hex}.%(ext)s')
+
+        cookies_file = (Config.YTDLP_COOKIES_FILE or '').strip()
+        if cookies_file:
+            if not os.path.exists(cookies_file):
+                raise FileNotFoundError(f"YTDLP_COOKIES_FILE 指向的 cookies 文件不存在: {cookies_file}")
+            options['cookiefile'] = cookies_file
+        return options
+
+    def _online_media_error_message(self, error: Exception) -> str:
+        err_msg = str(error)
+        lower_msg = err_msg.lower()
+        if "http error 412" in lower_msg or "precondition failed" in lower_msg:
+            err_msg += (
+                "\n\n【Bilibili 412 处理建议】"
+                "\n1. 先更新 yt-dlp：`pip install -U yt-dlp`。"
+                "\n2. 如果仍失败，B站要求登录态；请从浏览器导出 cookies.txt，"
+                "然后设置环境变量 `YTDLP_COOKIES_FILE=你的cookies.txt绝对路径` 后重启后端。"
+                "\n3. 确认链接可在当前网络和浏览器中正常打开，且没有地区、会员或风控限制。"
+            )
+        if any(k in lower_msg for k in ["proxy", "127.0.0.1", "refused", "积极拒绝", "connectionerror"]):
+            err_msg += "\n\n【提示】检测到代理/网络连接异常。请确认代理软件（如 Clash、V2ray 等）是否已开启并正常运行。如果已关闭代理软件，请检查系统环境变量中的 HTTP_PROXY/HTTPS_PROXY 或系统代理设置，以清除残留的代理配置。"
+        return err_msg
 
     def check_ffmpeg(self) -> bool:
         """检查系统中是否安装并配置了 FFmpeg"""
@@ -33,6 +96,7 @@ class AudioProcessor:
                 logger.warning("未检测到 FFmpeg 命令行工具，尝试使用 pydub 接口进行加载解析...")
                 try:
                     # pydub 尝试直读
+                    AudioSegment = self._audio_segment()
                     sound = AudioSegment.from_file(video_path)
                     sound = sound.set_frame_rate(16000).set_channels(1)
                     sound.export(output_path, format='wav')
@@ -73,6 +137,7 @@ class AudioProcessor:
         """
         try:
             logger.info(f"转换音频格式中: {input_path}")
+            AudioSegment = self._audio_segment()
             sound = AudioSegment.from_file(input_path)
             sound = sound.set_frame_rate(sample_rate).set_channels(1)
             sound.export(output_path, format='wav')
@@ -124,14 +189,7 @@ class AudioProcessor:
         """
         try:
             import yt_dlp
-            
-            # 定义下载选项 (优先下载低画质视频或音频以加速处理)
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl': os.path.join(output_dir, 'downloaded_temp_media.%(ext)s'),
-                'quiet': True,
-                'no_warnings': True
-            }
+            ydl_opts = self._yt_dlp_options(url, output_dir=output_dir)
             
             logger.info("开始请求网络媒体数据...")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -144,14 +202,13 @@ class AudioProcessor:
             raise ImportError("未发现 'yt_dlp' 第三方库，请先安装该依赖项再进行网络下载。")
         except Exception as e:
             logger.error(f"在线 URL 下载失败: {e}", exc_info=True)
-            err_msg = str(e)
-            if any(k in err_msg.lower() for k in ["proxy", "127.0.0.1", "refused", "积极拒绝", "connectionerror"]):
-                err_msg += "\n\n【提示】检测到代理/网络连接异常。请确认代理软件（如 Clash、V2ray 等）是否已开启并正常运行。如果已关闭代理软件，请检查系统环境变量中的 HTTP_PROXY/HTTPS_PROXY 或系统代理设置，以清除残留的代理配置。"
+            err_msg = self._online_media_error_message(e)
             raise RuntimeError(f"在线媒体下载失败: {err_msg}")
 
     def get_audio_duration(self, audio_path: str) -> float:
         """获取音频文件的总时长（秒）"""
         try:
+            AudioSegment = self._audio_segment()
             sound = AudioSegment.from_file(audio_path)
             return sound.duration_seconds
         except Exception as e:
@@ -163,11 +220,7 @@ class AudioProcessor:
         try:
             import yt_dlp
             import re
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'skip_download': True,
-            }
+            ydl_opts = self._yt_dlp_options(url, skip_download=True)
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 title = info.get('title')

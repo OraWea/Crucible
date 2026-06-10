@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import importlib
 import os
 import requests
 import secrets
@@ -57,6 +58,17 @@ _process_executor = ThreadPoolExecutor(
     max_workers=_process_worker_count(),
     thread_name_prefix="crucible-process",
 )
+
+
+def _load_processing_workflow():
+    """加载处理流水线；兼容开发期后端进程缓存了旧模块的情况。"""
+    importlib.invalidate_caches()
+    module = importlib.import_module("Crucible.utils.processing_workflow")
+    if not hasattr(module, "ProcessingOptions") or not hasattr(module, "ProcessingWorkflow"):
+        module = importlib.reload(module)
+    if not hasattr(module, "ProcessingOptions") or not hasattr(module, "ProcessingWorkflow"):
+        raise RuntimeError("处理流水线模块加载异常：缺少 ProcessingOptions 或 ProcessingWorkflow，请重启后端服务。")
+    return module.ProcessingOptions, module.ProcessingWorkflow
 
 
 class LoginRequest(BaseModel):
@@ -611,7 +623,7 @@ def start_process(payload: ProcessRequest, user: Dict[str, str] = Depends(_curre
 
     def runner() -> None:
         try:
-            from Crucible.utils.processing_workflow import ProcessingOptions, ProcessingWorkflow
+            ProcessingOptions, ProcessingWorkflow = _load_processing_workflow()
 
             progress("处理任务开始执行", 1)
 

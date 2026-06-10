@@ -197,6 +197,95 @@ class TestCoreFeatures(unittest.TestCase):
         finally:
             source_index_module.db_manager = old_db_manager
 
+    def test_source_index_reimport_replaces_segments_atomically(self):
+        import Crucible.utils.source_index as source_index_module
+
+        old_db_manager = source_index_module.db_manager
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                db_path = os.path.join(tmp_dir, "test.db")
+                from Crucible.utils.db_manager import DBManager
+
+                manager = DBManager(db_path)
+                source_index_module.db_manager = manager
+                index = SourceIndex()
+
+                first = index.replace_source_index(
+                    source_name="Demo.mp4",
+                    source_type="video",
+                    source_uri="Demo.mp4",
+                    source_hash="hash-demo",
+                    duration=10,
+                    segments=[
+                        {"start": 0, "end": 2, "text": "Transformer intro"},
+                        {"start": 3, "end": 5, "text": "Old segment"},
+                    ],
+                    concepts=[{"concept": "Transformer"}],
+                )
+                second = index.replace_source_index(
+                    source_name="Demo-renamed.mp4",
+                    source_type="video",
+                    source_uri="Demo.mp4",
+                    source_hash="hash-demo",
+                    duration=20,
+                    segments=[
+                        {"start": 7, "end": 9, "text": "Transformer updated"},
+                    ],
+                    concepts=[{"concept": "Transformer"}],
+                )
+
+                self.assertEqual(first["id"], second["id"])
+                self.assertEqual(len(index.get_segments(second["id"])), 1)
+                self.assertEqual(len(index.get_mentions_for_source(second["id"])), 1)
+                self.assertIn("Transformer updated", index.search("updated", limit=10)[0]["text"])
+                with manager.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("PRAGMA foreign_keys")
+                    self.assertEqual(cursor.fetchone()[0], 1)
+                    cursor.execute("SELECT COUNT(*) AS cnt FROM sources WHERE source_hash = ?", ("hash-demo",))
+                    self.assertEqual(cursor.fetchone()["cnt"], 1)
+        finally:
+            source_index_module.db_manager = old_db_manager
+
+    def test_source_index_replace_rolls_back_on_invalid_segment(self):
+        import Crucible.utils.source_index as source_index_module
+
+        old_db_manager = source_index_module.db_manager
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                db_path = os.path.join(tmp_dir, "test.db")
+                from Crucible.utils.db_manager import DBManager
+
+                source_index_module.db_manager = DBManager(db_path)
+                index = SourceIndex()
+                source = index.replace_source_index(
+                    source_name="Demo.mp4",
+                    source_type="video",
+                    source_uri="Demo.mp4",
+                    source_hash="hash-demo",
+                    segments=[{"start": 0, "end": 1, "text": "Stable segment"}],
+                    concepts=[{"concept": "Stable"}],
+                )
+
+                with self.assertRaises((TypeError, ValueError)):
+                    index.replace_source_index(
+                        source_name="Demo.mp4",
+                        source_type="video",
+                        source_uri="Demo.mp4",
+                        source_hash="hash-demo",
+                        segments=[{"start": object(), "end": 2, "text": "Broken segment"}],
+                        concepts=[{"concept": "Broken"}],
+                    )
+
+                segments = index.get_segments(source["id"])
+                mentions = index.get_mentions_for_source(source["id"])
+                self.assertEqual(len(segments), 1)
+                self.assertEqual(segments[0]["text"], "Stable segment")
+                self.assertEqual(len(mentions), 1)
+                self.assertEqual(mentions[0]["concept_name"], "Stable")
+        finally:
+            source_index_module.db_manager = old_db_manager
+
     def test_source_note_contains_traceable_timestamp_links(self):
         index = SourceIndex()
         source = {
