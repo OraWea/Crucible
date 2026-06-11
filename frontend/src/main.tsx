@@ -182,6 +182,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const previousJobStatusesRef = useRef<Record<string, ProcessJob["status"]>>({});
   const previewCacheRef = useRef<Map<string, string>>(new Map());
   const previewAbortRef = useRef<AbortController | null>(null);
@@ -576,6 +577,22 @@ function App() {
   const activeJob = jobs.find((job) => job.id === activeJobId) || jobs[0];
   const currentSourceKind = sourceKind(activeSource?.source_type);
   const currentSourceLabel = currentSourceKind === "audio" ? "音频" : currentSourceKind === "document" ? "文档" : "视频";
+
+  // 判断当前来源是否为可播放的本地视频文件
+  const isLocalVideo = useMemo(() => {
+    if (!activeSource) return false;
+    const uri = activeSource.source_uri || "";
+    if (uri.startsWith("http://") || uri.startsWith("https://")) return false;
+    const ext = uri.split(".").pop()?.toLowerCase() || "";
+    return ["mp4", "mkv", "avi", "mov", "webm"].includes(ext) && activeSource.source_type === "video";
+  }, [activeSource]);
+
+  // 构造带鉴权 token 的视频流 URL（?token= 参数供 <video src> 使用，无法设置 header）
+  const localVideoUrl = useMemo(() => {
+    if (!isLocalVideo || !activeSource) return "";
+    return `/api/sources/${activeSource.id}/video${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+  }, [isLocalVideo, activeSource, token]);
+
   const filteredSegments = useMemo(() => {
     const needle = sourceFilter.trim().toLowerCase();
     if (!needle) return segments;
@@ -1157,6 +1174,22 @@ function App() {
         <div className="empty-state">暂无关键帧。重新处理本地视频后会保存画面信息。</div>
       ) : null}
 
+      {/* 本地视频播放器 */}
+      {isLocalVideo && localVideoUrl && (
+        <div className="local-video-player">
+          <video
+            ref={videoRef}
+            src={localVideoUrl}
+            controls
+            preload="metadata"
+            className="source-video"
+            onError={() => setMessage("视频加载失败，请确认后端服务已启动且文件存在。")}
+          >
+            您的浏览器不支持 HTML5 视频播放。
+          </video>
+        </div>
+      )}
+
       <label className="inline-filter">
         <Search size={15} />
         <input value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} placeholder="筛选片段或时间戳" />
@@ -1167,7 +1200,16 @@ function App() {
           <button
             className={`segment-row tone-${["blue", "yellow", "green"][index % 3]}`}
             key={segment.id}
-            onClick={() => activeSource && openNote(activeSource.source_note_path, segment.timestamp_label)}
+            onClick={() => {
+              if (isLocalVideo && videoRef.current) {
+                // 本地视频：直接跳转到时间戳秒数
+                videoRef.current.currentTime = segment.start_time;
+                videoRef.current.play().catch(() => undefined);
+              } else {
+                // URL 来源或非视频：跳转到笔记页对应时间戳
+                activeSource && openNote(activeSource.source_note_path, segment.timestamp_label);
+              }
+            }}
           >
             <Clock3 size={15} />
             <time>{segment.timestamp_label}</time>

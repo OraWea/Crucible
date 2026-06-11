@@ -118,7 +118,7 @@ class WikiEditor:
     def extract_wiki_link_items(self, content: str) -> List[Dict[str, str]]:
         """解析 [[Note]]、[[Note|Alias]]、[[Note#Heading|Label]]。"""
         items = []
-        for match in re.findall(r'\[\[(.*?)\]\]', content or ""):
+        for match in re.findall(r'(?<!\!)\[\[(.*?)\]\]', content or ""):
             raw_target, alias = (match.split("|", 1) + [""])[:2] if "|" in match else (match, "")
             target, anchor = (raw_target.split("#", 1) + [""])[:2] if "#" in raw_target else (raw_target, "")
             target = target.strip()

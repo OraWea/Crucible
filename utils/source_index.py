@@ -466,13 +466,6 @@ class SourceIndex:
                 "type": "source_mentions_concept",
                 "timestamp": row["timestamp_label"],
             })
-            edges.append({
-                "source": row["concept_name"],
-                "target": row["timestamp_label"],
-                "source_path": row["source_note_path"],
-                "type": "concept_has_timestamp",
-                "timestamp": row["timestamp_label"],
-            })
         return edges
 
     def _json_field(self, raw: str, fallback):

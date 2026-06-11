@@ -12,9 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -197,6 +197,21 @@ def _current_user(authorization: str = Header(default="")) -> Dict[str, str]:
         raise HTTPException(status_code=401, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ").strip()
     user = _sessions.get(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return user
+
+
+def _resolve_token(authorization: str = Header(default=""), token: Optional[str] = None) -> Dict[str, str]:
+    """同时支持 Authorization header 和 ?token= query param，供 <video src> 使用。"""
+    raw_token: Optional[str] = None
+    if authorization.startswith("Bearer "):
+        raw_token = authorization.removeprefix("Bearer ").strip()
+    elif token:
+        raw_token = token.strip()
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    user = _sessions.get(raw_token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
@@ -763,3 +778,94 @@ def get_source_keyframe(source_id: int, filename: str, user: Dict[str, str] = De
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Keyframe file not found")
     return FileResponse(file_path, media_type="image/jpeg")
+
+
+@app.get("/api/sources/{source_id}/video")
+def stream_source_video(source_id: int, request: Request, user: Dict[str, str] = Depends(_resolve_token)):
+    """流式传输本地视频文件，支持 HTTP Range 请求以便浏览器原生 <video> 播放。
+    鉴权同时接受 Authorization header 和 ?token= query param。
+    """
+    detail = source_index.get_source_detail(source_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    source = detail["source"]
+    source_uri = source.get("source_uri", "")
+
+    # 仅支持本地文件，URL 类型来源不在此处理
+    if source_uri.startswith(("http://", "https://")):
+        raise HTTPException(status_code=404, detail="URL sources cannot be streamed")
+
+    if not os.path.exists(source_uri):
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+
+    ext = os.path.splitext(source_uri)[1].lower()
+    media_type_map = {
+        ".mp4": "video/mp4",
+        ".mkv": "video/x-matroska",
+        ".avi": "video/x-msvideo",
+        ".mov": "video/quicktime",
+        ".webm": "video/webm",
+    }
+    media_type = media_type_map.get(ext)
+    if not media_type:
+        raise HTTPException(status_code=400, detail="Unsupported video format")
+
+    file_size = os.path.getsize(source_uri)
+    range_header = request.headers.get("range")
+    chunk_size = 1024 * 1024  # 1 MB
+
+    if range_header:
+        try:
+            range_val = range_header.strip().replace("bytes=", "")
+            range_start, range_end = range_val.split("-")
+            start = int(range_start)
+            end = int(range_end) if range_end else min(start + chunk_size - 1, file_size - 1)
+        except (ValueError, AttributeError):
+            raise HTTPException(status_code=416, detail="Invalid Range header")
+
+        if start >= file_size or end >= file_size:
+            raise HTTPException(status_code=416, detail="Range out of bounds")
+
+        content_length = end - start + 1
+
+        def video_chunk_generator():
+            with open(source_uri, "rb") as f:
+                f.seek(start)
+                remaining = content_length
+                while remaining > 0:
+                    data = f.read(min(chunk_size, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+
+        return StreamingResponse(
+            video_chunk_generator(),
+            status_code=206,
+            media_type=media_type,
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+            },
+        )
+
+    # 无 Range 请求：返回完整文件
+    def full_generator():
+        with open(source_uri, "rb") as f:
+            while True:
+                data = f.read(chunk_size)
+                if not data:
+                    break
+                yield data
+
+    return StreamingResponse(
+        full_generator(),
+        status_code=200,
+        media_type=media_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+        },
+    )

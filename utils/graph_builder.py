@@ -34,8 +34,9 @@ class KnowledgeGraphBuilder:
                     target = target.strip()
                     if not target:
                         continue
-                    nodes.setdefault(target, {"id": target, "path": "", "out_degree": 0, "in_degree": 0})
-                    self._add_edge(nodes, edges, source, target, rel_path, "wiki_link", "")
+                    target_name = os.path.splitext(os.path.basename(target))[0]
+                    nodes.setdefault(target_name, {"id": target_name, "path": "", "out_degree": 0, "in_degree": 0})
+                    self._add_edge(nodes, edges, source, target_name, rel_path, "wiki_link", "")
 
         for edge in source_index.graph_edges():
             self._add_edge(

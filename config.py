@@ -1,9 +1,11 @@
 import json
 import os
-from dotenv import load_dotenv
-
-# 加载 .env 配置文件
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # 加载 .env 配置文件
+    load_dotenv()
+except ImportError:
+    pass
 
 class Config:
     # 基础路径配置
@@ -32,8 +34,9 @@ class Config:
     WHISPER_MODEL_NAME = os.environ.get('WHISPER_MODEL_NAME') or 'base'
     WHISPER_DEVICE = os.environ.get('WHISPER_DEVICE') or 'cuda' # 有N卡且显存够推荐 'cuda'，否则 'cpu'
     
-    # VLM 视觉大模型设置 (本地运行推荐 Qwen/Qwen2-VL-7B-Instruct，也可以使用 API 形式)
-    VLM_MODEL_ID = os.environ.get('VLM_MODEL_ID') or 'Qwen/Qwen2-VL-7B-Instruct'
+    # VLM 视觉大模型设置 (本地路径或 HuggingFace Hub ID，也可以使用 API 形式)
+    # 默认指向本地已下载的 Qwen2-VL-2B-Instruct 权重目录
+    VLM_MODEL_ID = os.environ.get('VLM_MODEL_ID') or os.path.join(BASE_DIR, 'Qwen2-VL-2B-Instruct')
     VLM_DEVICE = os.environ.get('VLM_DEVICE') or 'cuda'
     
     # LLM (Qwen API/本地双模适配)
@@ -166,6 +169,7 @@ class Config:
         provider: str = None,
         vlm_model_name: str = None,
         fact_checker_model_name: str = None,
+        vlm_model_id: str = None,
     ):
         """更新运行期 LLM 配置，供 GUI 临时覆盖使用。"""
         if api_key is not None:
@@ -180,6 +184,8 @@ class Config:
             Config.VLM_MODEL_NAME = vlm_model_name
         if fact_checker_model_name is not None:
             Config.FACT_CHECKER_MODEL_NAME = fact_checker_model_name
+        if vlm_model_id is not None:
+            Config.VLM_MODEL_ID = vlm_model_id
 
     @staticmethod
     def load_local_settings():
@@ -200,6 +206,7 @@ class Config:
             provider=settings.get("provider"),
             vlm_model_name=settings.get("vlm_model"),
             fact_checker_model_name=settings.get("fact_model"),
+            vlm_model_id=settings.get("vlm_model_id"),
         )
         if settings.get("vault_path"):
             Config.OBSIDIAN_VAULT_PATH = settings["vault_path"]
@@ -218,6 +225,7 @@ class Config:
         api_key: str = None,
         whisper_model: str = None,
         whisper_device: str = None,
+        vlm_model_id: str = None,
     ):
         """保存 GUI 中的模型配置到本地配置文件。"""
         os.makedirs(os.path.dirname(Config.LOCAL_SETTINGS_PATH), exist_ok=True)
@@ -225,6 +233,8 @@ class Config:
             Config.WHISPER_MODEL_NAME = whisper_model
         if whisper_device is not None:
             Config.WHISPER_DEVICE = whisper_device
+        if vlm_model_id is not None:
+            Config.VLM_MODEL_ID = vlm_model_id
 
         settings = {
             "provider": provider,
@@ -235,6 +245,7 @@ class Config:
             "vault_path": Config.OBSIDIAN_VAULT_PATH,
             "whisper_model": Config.WHISPER_MODEL_NAME,
             "whisper_device": Config.WHISPER_DEVICE,
+            "vlm_model_id": Config.VLM_MODEL_ID,
         }
         if api_key:
             settings["api_key"] = api_key

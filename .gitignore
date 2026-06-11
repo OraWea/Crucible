@@ -18,3 +18,7 @@ data/vault/
 # 忽略临时运行文件
 temp/
 scratch/
+frontend/.npm-cache/
+frontend/node_modules/
+Qwen2-VL-2B-Instruct/
+.idea/

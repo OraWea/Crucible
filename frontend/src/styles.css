@@ -1605,3 +1605,41 @@ dd {
     grid-column: 2;
   }
 }
+
+/* ─── 本地视频播放器 ─── */
+.local-video-player {
+  margin-top: 12px;
+  padding: 10px;
+  border: 2px solid rgba(38, 50, 56, 0.65);
+  background: #1a1a2e;
+  position: relative;
+}
+
+.local-video-player::before {
+  content: "▶ 本地视频";
+  position: absolute;
+  top: -11px;
+  left: 10px;
+  padding: 0 8px;
+  background: var(--yellow);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.source-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  outline: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 时间戳行在有本地视频时显示播放跳转光标 */
+.segment-row:has(~ .local-video-player),
+.local-video-player ~ .inline-filter ~ .segment-list .segment-row {
+  cursor: alias;
+}
